@@ -22,7 +22,10 @@ namespace TreeMethod.Views
         private readonly TreeModel _tree = ProjectData.CurrentTree;
  
         private GViewer _viewer;
-        private System.Windows.Controls.ContextMenu _contextMenu;
+        private System.Windows.Forms.ContextMenuStrip _contextMenuStrip;
+        private bool _isConnecting = false;
+        private int? _connectSourceId = null;
+        private int? _nodeUnderCursorId = null;
         
         public TreePage()
         {
@@ -53,45 +56,66 @@ namespace TreeMethod.Views
                 PanButtonPressed = true
             };
             
-            // Создаем контекстное меню WPF
-            _contextMenu = new System.Windows.Controls.ContextMenu();
-            
-            var addChildItem = new System.Windows.Controls.MenuItem { Header = "Добавить потомка" };
-            addChildItem.Click += (s, e) => AddChildToSelectedNode();
-            
-            var renameItem = new System.Windows.Controls.MenuItem { Header = "Переименовать" };
-            renameItem.Click += (s, e) => RenameSelectedNode();
-            
-            // Подменю для быстрого изменения типа узла
-            var changeTypeMenu = new System.Windows.Controls.MenuItem { Header = "Изменить тип" };
-            
-            var typeAndItem = new System.Windows.Controls.MenuItem { Header = "AND" };
-            typeAndItem.Click += (s, e) => ChangeNodeType(NodeType.And);
-            
-            var typeOrItem = new System.Windows.Controls.MenuItem { Header = "OR" };
-            typeOrItem.Click += (s, e) => ChangeNodeType(NodeType.Or);
-            
-            var typeLeafItem = new System.Windows.Controls.MenuItem { Header = "LEAF" };
-            typeLeafItem.Click += (s, e) => ChangeNodeType(NodeType.Leaf);
-            
-            changeTypeMenu.Items.Add(typeAndItem);
-            changeTypeMenu.Items.Add(typeOrItem);
-            changeTypeMenu.Items.Add(typeLeafItem);
-            
-            var deleteItem = new System.Windows.Controls.MenuItem { Header = "Удалить" };
-            deleteItem.Click += (s, e) => DeleteSelectedNode();
-            
-            _contextMenu.Items.Add(addChildItem);
-            _contextMenu.Items.Add(renameItem);
-            _contextMenu.Items.Add(changeTypeMenu);
-            _contextMenu.Items.Add(deleteItem);
-            
-            // Добавляем контекстное меню к WinFormsHost
-            WinFormsHost.ContextMenu = _contextMenu;
+            // Создаем контекстное меню WinForms для самого GViewer
+            _contextMenuStrip = new System.Windows.Forms.ContextMenuStrip();
+
+            var addChildItem = new System.Windows.Forms.ToolStripMenuItem("Добавить потомка");
+            addChildItem.Click += (s, e) =>
+            {
+                var id = GetTargetNodeId();
+                if (id.HasValue) AddChildMsagl(id.Value);
+            };
+
+            var renameItem = new System.Windows.Forms.ToolStripMenuItem("Переименовать");
+            renameItem.Click += (s, e) =>
+            {
+                var id = GetTargetNodeId();
+                if (id.HasValue) RenameNodeMsagl(id.Value);
+            };
+
+            var changeTypeMenu = new System.Windows.Forms.ToolStripMenuItem("Изменить тип");
+            var typeAndItem = new System.Windows.Forms.ToolStripMenuItem("AND");
+            typeAndItem.Click += (s, e) =>
+            {
+                var id = GetTargetNodeId();
+                if (id.HasValue) ChangeNodeType(NodeType.And);
+            };
+            var typeOrItem = new System.Windows.Forms.ToolStripMenuItem("OR");
+            typeOrItem.Click += (s, e) =>
+            {
+                var id = GetTargetNodeId();
+                if (id.HasValue) ChangeNodeType(NodeType.Or);
+            };
+            var typeLeafItem = new System.Windows.Forms.ToolStripMenuItem("LEAF");
+            typeLeafItem.Click += (s, e) =>
+            {
+                var id = GetTargetNodeId();
+                if (id.HasValue) ChangeNodeType(NodeType.Leaf);
+            };
+            changeTypeMenu.DropDownItems.Add(typeAndItem);
+            changeTypeMenu.DropDownItems.Add(typeOrItem);
+            changeTypeMenu.DropDownItems.Add(typeLeafItem);
+
+            var deleteItem = new System.Windows.Forms.ToolStripMenuItem("Удалить");
+            deleteItem.Click += (s, e) =>
+            {
+                var id = GetTargetNodeId();
+                if (id.HasValue) DeleteNodeMsagl(id.Value);
+            };
+
+            _contextMenuStrip.Items.Add(addChildItem);
+            _contextMenuStrip.Items.Add(renameItem);
+            _contextMenuStrip.Items.Add(changeTypeMenu);
+            _contextMenuStrip.Items.Add(deleteItem);
+
+            // Назначаем контекстное меню непосредственно контролу GViewer
+            _viewer.ContextMenuStrip = _contextMenuStrip;
             
             // Подписываемся на события
             _viewer.MouseClick += Viewer_MouseClick;
             _viewer.ObjectUnderMouseCursorChanged += Viewer_ObjectUnderMouseCursorChanged;
+            _viewer.MouseDown += Viewer_MouseDown;
+            _viewer.MouseUp += Viewer_MouseUp;
             // Событие EdgeInserted больше не поддерживается в текущей версии MSAGL
             
             // Перетаскивание узлов включено по умолчанию в текущей версии MSAGL
@@ -367,6 +391,15 @@ namespace TreeMethod.Views
                 // Используем стандартный метод установки подсказки
                 System.Windows.Forms.ToolTip toolTip = new System.Windows.Forms.ToolTip();
                 toolTip.SetToolTip(_viewer, "Щелкните правой кнопкой мыши для вызова меню");
+                var vnode = (Microsoft.Msagl.Drawing.Node)e.NewObject;
+                if (int.TryParse(vnode.Id, out var id))
+                    _nodeUnderCursorId = id;
+                else
+                    _nodeUnderCursorId = null;
+            }
+            else
+            {
+                _nodeUnderCursorId = null;
             }
         }
         
@@ -396,15 +429,21 @@ namespace TreeMethod.Views
         
         private void ChangeNodeType(NodeType newType)
         {
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
+            var nodeIdOpt = GetTargetNodeId();
+            if (!nodeIdOpt.HasValue) return;
+            var nodeId = nodeIdOpt.Value;
+
+            var modelNode = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            if (modelNode != null)
             {
-                var modelNode = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
-                if (modelNode != null)
+                if (newType == NodeType.Leaf && modelNode.Children.Any())
                 {
-                    modelNode.Type = newType;
-                    BuildAndDrawGraphMsagl();
-                    ProjectData.RaiseTreeChanged();
+                    System.Windows.MessageBox.Show("Нельзя установить тип Leaf: у узла есть потомки.", "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
+                modelNode.Type = newType;
+                BuildAndDrawGraphMsagl();
+                ProjectData.RaiseTreeChanged();
             }
         }
         
@@ -414,6 +453,74 @@ namespace TreeMethod.Views
             {
                 DeleteNodeMsagl(nodeId);
             }
+        }
+
+        private void Viewer_MouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            // Начало режима соединения: удерживайте Shift и нажмите на узел
+            if (e.Button == System.Windows.Forms.MouseButtons.Left && (System.Windows.Forms.Control.ModifierKeys & System.Windows.Forms.Keys.Shift) == System.Windows.Forms.Keys.Shift)
+            {
+                if (_nodeUnderCursorId.HasValue)
+                {
+                    _isConnecting = true;
+                    _connectSourceId = _nodeUnderCursorId.Value;
+                }
+            }
+        }
+
+        private int? GetTargetNodeId()
+        {
+            if (_nodeUnderCursorId.HasValue) return _nodeUnderCursorId.Value;
+            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
+                return nodeId;
+            return null;
+        }
+
+        private void Viewer_MouseUp(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (_isConnecting)
+            {
+                _isConnecting = false;
+                if (_connectSourceId.HasValue && _nodeUnderCursorId.HasValue)
+                {
+                    var src = _connectSourceId.Value;
+                    var dst = _nodeUnderCursorId.Value;
+                    _connectSourceId = null;
+                    if (src != dst)
+                    {
+                        TryConnectNodes(src, dst);
+                    }
+                }
+            }
+        }
+
+        private void TryConnectNodes(int parentId, int childId)
+        {
+            // Валидация: один родитель на узел
+            var hasOtherParent = _tree.Nodes.Any(n => n.Children.Contains(childId) && n.Id != parentId);
+            if (hasOtherParent)
+            {
+                System.Windows.MessageBox.Show("Узел уже имеет другого родителя. Строгое дерево: один родитель.", "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Валидация: отсутствие циклов (child не должен быть предком parent)
+            var descendantsOfChild = GetNodeWithDescendants(childId);
+            if (descendantsOfChild.Contains(parentId))
+            {
+                System.Windows.MessageBox.Show("Создание цикла запрещено.", "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var parentNode = _tree.Nodes.FirstOrDefault(n => n.Id == parentId);
+            var childNode = _tree.Nodes.FirstOrDefault(n => n.Id == childId);
+            if (parentNode == null || childNode == null) return;
+
+            if (!parentNode.Children.Contains(childId))
+                parentNode.Children.Add(childId);
+
+            BuildAndDrawGraphMsagl();
+            ProjectData.RaiseTreeChanged();
         }
     }
 }
