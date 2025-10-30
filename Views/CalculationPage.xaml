@@ -1,0 +1,52 @@
+﻿<Page x:Class="TreeMethod.Views.CalculationPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      mc:Ignorable="d"
+      Title="CalculationPage">
+
+    <Grid Background="#FFF">
+        <DockPanel>
+            <TextBlock Text="Расчёт И-ИЛИ дерева"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Margin="20"
+                       DockPanel.Dock="Top" />
+
+            <StackPanel Margin="20" Orientation="Vertical" VerticalAlignment="Top">
+                <TextBlock Text="Алгоритм №1 — теоретическое множество решений"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Margin="0,10,0,5"/>
+                <Button Content="▶ Выполнить расчёт |RT|"
+                        Width="250"
+                        Height="35"
+                        Command="{Binding RunCalculationCommand}"
+                        Margin="0,0,0,15" />
+
+                <TextBlock Text="Алгоритм №2 — поиск рациональных решений"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Margin="0,10,0,5"/>
+                <Button Content="▶ Выполнить поиск рациональных решений"
+                        Width="350"
+                        Height="35"
+                        Margin="0,0,0,20" />
+
+                <Border BorderThickness="1"
+                        BorderBrush="Gray"
+                        CornerRadius="4"
+                        Padding="10"
+                        Background="#FAFAFA"
+                        Height="200">
+                    <TextBlock Text="Результаты расчёта будут отображены здесь."
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"
+                               Foreground="Gray"
+                               FontSize="16"/>
+                </Border>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Page>
