@@ -229,6 +229,17 @@ namespace TreeMethod
 
         private void RunCalculation()
         {
+            // Сохраняем текущие изменения матриц перед расчетом
+            var matricesPage = MatricesPage as MatricesPage;
+            if (matricesPage != null)
+            {
+                var matricesViewModel = matricesPage.DataContext as MatricesPageViewModel;
+                if (matricesViewModel != null)
+                {
+                    matricesViewModel.SaveAllMatricesData();
+                }
+            }
+
             IsBusy = true;
             StatusText = "Выполняется расчёт...";
 
