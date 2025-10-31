@@ -51,8 +51,32 @@ namespace TreeMethod.Views
             var tree = ProjectData.CurrentTree;
             if (tree.Nodes.Count == 0) return;
 
-            int pCount = _features.Length;
-            int aCount = _goals.Length;
+            // Автоматически определяем размеры матриц из загруженных данных
+            int pCount = _features.Length; // По умолчанию
+            int aCount = _goals.Length;    // По умолчанию
+            
+            // Если матрицы загружены, используем их размеры
+            if (tree.EP != null && tree.EP.GetLength(1) > 0)
+            {
+                pCount = tree.EP.GetLength(1); // Количество столбцов (признаков) из EP
+            }
+            else if (tree.AP != null && tree.AP.GetLength(1) > 0)
+            {
+                pCount = tree.AP.GetLength(1); // Количество столбцов (признаков) из AP
+            }
+            
+            if (tree.AP != null && tree.AP.GetLength(0) > 0)
+            {
+                aCount = tree.AP.GetLength(0); // Количество строк (целей) из AP
+            }
+            
+            // Обновляем массивы признаков и целей
+            _features = Enumerable.Range(1, pCount).Select(i => $"P{i}").ToArray();
+            _goals = Enumerable.Range(1, aCount).Select(i => $"A{i}").ToArray();
+            
+            // Обновляем значения в UI
+            PCountBox.Text = pCount.ToString();
+            ACountBox.Text = aCount.ToString();
 
             // --- E×P ---
             _epRows = new List<MatrixRow>();
@@ -67,13 +91,20 @@ namespace TreeMethod.Views
                 var row = new MatrixRow { Name = rows[i].Name };
 
                 // если матрица EP уже существует — читаем из неё
-                if (tree.EP != null && tree.EP.GetLength(0) == rows.Count && tree.EP.GetLength(1) == pCount)
+                if (tree.EP != null && tree.EP.GetLength(0) > i)
                 {
-                    for (int j = 0; j < pCount; j++)
+                    int epCols = tree.EP.GetLength(1);
+                    // Читаем значения из матрицы (сколько есть столбцов)
+                    for (int j = 0; j < Math.Min(pCount, epCols); j++)
                         row.SetValue(_features[j], tree.EP[i, j]);
+                    
+                    // Если в матрице больше столбцов, чем признаков - заполняем нулями
+                    for (int j = epCols; j < pCount; j++)
+                        row.SetValue(_features[j], 0);
                 }
                 else
                 {
+                    // Если матрицы нет, заполняем нулями
                     foreach (var f in _features)
                         row.SetValue(f, 0);
                 }
@@ -104,13 +135,20 @@ namespace TreeMethod.Views
             {
                 var row = new MatrixRow { Name = _goals[i] };
 
-                if (tree.AP != null && tree.AP.GetLength(0) == aCount && tree.AP.GetLength(1) == pCount)
+                if (tree.AP != null && tree.AP.GetLength(0) > i)
                 {
-                    for (int j = 0; j < pCount; j++)
+                    int apCols = tree.AP.GetLength(1);
+                    // Читаем значения из матрицы (сколько есть столбцов)
+                    for (int j = 0; j < Math.Min(pCount, apCols); j++)
                         row.SetValue(_features[j], tree.AP[i, j]);
+                    
+                    // Если в матрице больше столбцов, чем признаков - заполняем нулями
+                    for (int j = apCols; j < pCount; j++)
+                        row.SetValue(_features[j], 0);
                 }
                 else
                 {
+                    // Если матрицы нет, заполняем нулями
                     foreach (var f in _features)
                         row.SetValue(f, 0);
                 }
