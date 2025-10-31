@@ -14,7 +14,8 @@ namespace TreeMethod.Views
 {
     public partial class TreePage : Page
     {
-        private readonly TreeModel _tree = ProjectData.CurrentTree;
+        // Используем свойство для доступа к актуальному дереву
+        private TreeModel CurrentTree => ProjectData.CurrentTree;
  
         // Словари для хранения UI элементов
         private Dictionary<int, Border> _nodeBorders = new(); // Border - контейнер узла
@@ -54,8 +55,8 @@ namespace TreeMethod.Views
         {
             InitializeComponent();
 
-            if (_tree.Nodes.Count == 0)
-                _tree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
+            if (CurrentTree.Nodes.Count == 0)
+                CurrentTree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
 
             Focusable = true;
             InitializeContextMenu();
@@ -96,7 +97,7 @@ namespace TreeMethod.Views
             
             // Если нет позиций узлов, вычисляем их автоматически (сверху вниз)
             // Но НЕ пересчитываем позиции узлов, которые были перемещены вручную
-            var nodesWithoutPositions = _tree.Nodes.Where(n => !_nodePositions.ContainsKey(n.Id)).ToList();
+            var nodesWithoutPositions = CurrentTree.Nodes.Where(n => !_nodePositions.ContainsKey(n.Id)).ToList();
             if (_nodePositions.Count == 0 || nodesWithoutPositions.Any())
             {
                 // Сохраняем позиции вручную перемещённых узлов
@@ -124,20 +125,60 @@ namespace TreeMethod.Views
             
             // Рисуем узлы
             DrawNodes();
+            
+            // Обновляем размер Canvas в зависимости от размера графа
+            UpdateCanvasSize();
+        }
+        
+        private void UpdateCanvasSize()
+        {
+            if (!_nodePositions.Any())
+            {
+                // Минимальный размер, если нет узлов
+                GraphCanvas.Width = 2000;
+                GraphCanvas.Height = 1000;
+                return;
+            }
+            
+            // Находим границы всех узлов
+            double minX = _nodePositions.Values.Min(p => p.X);
+            double minY = _nodePositions.Values.Min(p => p.Y);
+            double maxX = _nodePositions.Values.Max(p => p.X) + NODE_WIDTH;
+            double maxY = _nodePositions.Values.Max(p => p.Y) + NODE_HEIGHT;
+            
+            // Добавляем отступы по краям
+            const double padding = 100;
+            
+            // Canvas должен быть достаточно большим, чтобы вместить все узлы
+            double requiredWidth = maxX + padding;
+            double requiredHeight = maxY + padding;
+            
+            // Если есть узлы с отрицательными координатами, добавляем место слева/сверху
+            if (minX < 0)
+                requiredWidth += Math.Abs(minX) + padding;
+            if (minY < 0)
+                requiredHeight += Math.Abs(minY) + padding;
+            
+            // Минимальный размер
+            const double minWidth = 800;
+            const double minHeight = 600;
+            
+            GraphCanvas.Width = Math.Max(minWidth, requiredWidth);
+            GraphCanvas.Height = Math.Max(minHeight, requiredHeight);
         }
         
         private void CalculateNodePositions()
         {
             _nodePositions.Clear();
             
-            if (!_tree.Nodes.Any()) return;
+            if (!CurrentTree.Nodes.Any()) return;
             
             // Находим корень (узел без родителей)
-            var rootNode = _tree.Nodes.FirstOrDefault(n => 
-                !_tree.Nodes.Any(p => p.Children.Contains(n.Id)));
+            var rootNode = CurrentTree.Nodes.FirstOrDefault(n => 
+                !CurrentTree.Nodes.Any(p => p.Children.Contains(n.Id)));
             
             if (rootNode == null)
-                rootNode = _tree.Nodes[0]; // Если не нашли, берём первый
+                rootNode = CurrentTree.Nodes[0]; // Если не нашли, берём первый
             
             var startX = 1000.0; // Центр Canvas
             var startY = 100.0;
@@ -152,7 +193,7 @@ namespace TreeMethod.Views
         
         private double CalculateSubtreeWidths(int nodeId, Dictionary<int, double> widths)
         {
-            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            var node = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return NODE_WIDTH;
             
             if (!node.Children.Any())
@@ -182,7 +223,7 @@ namespace TreeMethod.Views
         
         private double CalculatePositionRecursive(int nodeId, double leftX, double y, int depth, Dictionary<int, double> subtreeWidths)
         {
-            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            var node = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return leftX;
             
             // Если узел был перемещён вручную, не пересчитываем его позицию, но размещаем его потомков
@@ -284,7 +325,7 @@ namespace TreeMethod.Views
         
         private void DrawNodes()
         {
-            foreach (var node in _tree.Nodes)
+            foreach (var node in CurrentTree.Nodes)
             {
                 if (!_nodePositions.ContainsKey(node.Id)) continue;
                 
@@ -337,7 +378,7 @@ namespace TreeMethod.Views
         
         private void DrawEdges()
         {
-            foreach (var parent in _tree.Nodes)
+            foreach (var parent in CurrentTree.Nodes)
             {
                 foreach (var childId in parent.Children.Distinct())
                 {
@@ -465,6 +506,18 @@ namespace TreeMethod.Views
                     _nodeStartPosition.X + deltaX,
                     _nodeStartPosition.Y + deltaY);
                 
+                // Ограничиваем перемещение границами Canvas
+                var minX = 0;
+                var minY = 0;
+                // Используем Width/Height, так как они установлены динамически
+                var canvasWidth = GraphCanvas.Width > 0 ? GraphCanvas.Width : (GraphCanvas.ActualWidth > 0 ? GraphCanvas.ActualWidth : 2000);
+                var canvasHeight = GraphCanvas.Height > 0 ? GraphCanvas.Height : (GraphCanvas.ActualHeight > 0 ? GraphCanvas.ActualHeight : 1000);
+                var maxX = canvasWidth - NODE_WIDTH;
+                var maxY = canvasHeight - NODE_HEIGHT;
+                
+                newPos.X = Math.Max(minX, Math.Min(maxX, newPos.X));
+                newPos.Y = Math.Max(minY, Math.Min(maxY, newPos.Y));
+                
                 _nodePositions[_draggedNodeId.Value] = newPos;
                 
                 var border = _nodeBorders[_draggedNodeId.Value];
@@ -522,31 +575,31 @@ namespace TreeMethod.Views
         {
             _nodeContextMenu = new ContextMenu();
             
-            var addChildItem = new MenuItem { Header = "Добавить потомка" };
-            addChildItem.Click += (s, e) => 
+            var addChildItem = new MenuItem { Header = "Добавить потомка", Name = "AddChildMenuItem" };
+            addChildItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) AddChild(_selectedNodeId.Value);
             };
-            
+
             var renameItem = new MenuItem { Header = "Переименовать" };
-            renameItem.Click += (s, e) => 
+            renameItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) RenameNode(_selectedNodeId.Value);
             };
-            
+
             var changeTypeMenu = new MenuItem { Header = "Изменить тип" };
             var typeAndItem = new MenuItem { Header = "AND" };
-            typeAndItem.Click += (s, e) => 
+            typeAndItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.And);
             };
             var typeOrItem = new MenuItem { Header = "OR" };
-            typeOrItem.Click += (s, e) => 
+            typeOrItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.Or);
             };
             var typeLeafItem = new MenuItem { Header = "LEAF" };
-            typeLeafItem.Click += (s, e) => 
+            typeLeafItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.Leaf);
             };
@@ -555,16 +608,137 @@ namespace TreeMethod.Views
             changeTypeMenu.Items.Add(typeLeafItem);
             
             var deleteItem = new MenuItem { Header = "Удалить" };
-            deleteItem.Click += (s, e) => 
+            deleteItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) DeleteNode(_selectedNodeId.Value);
             };
+            
+            var clearGraphItem = new MenuItem { Header = "Очистить граф, кроме корня" };
+            clearGraphItem.Click += (s, e) => ClearGraphExceptRoot();
             
             _nodeContextMenu.Items.Add(addChildItem);
             _nodeContextMenu.Items.Add(renameItem);
             _nodeContextMenu.Items.Add(changeTypeMenu);
             _nodeContextMenu.Items.Add(new Separator());
+            _nodeContextMenu.Items.Add(clearGraphItem);
+            _nodeContextMenu.Items.Add(new Separator());
             _nodeContextMenu.Items.Add(deleteItem);
+        }
+        
+        public void RefreshGraph()
+        {
+            // Обновляем ссылку на актуальное дерево из ProjectData
+            // Это важно при загрузке нового проекта
+            var currentTree = ProjectData.CurrentTree;
+            
+            // Сбрасываем позиции и перестраиваем граф
+            _nodePositions.Clear();
+            _manuallyMovedNodes.Clear();
+            
+            if (currentTree.Nodes.Count == 0)
+                currentTree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
+            
+            // Используем актуальное дерево для построения графа
+            BuildGraph();
+            
+            // После построения смещаем все узлы к началу координат для удобства просмотра
+            NormalizeNodePositions();
+            
+            // Перестраиваем граф с нормализованными позициями
+            BuildGraph();
+            
+            // Автоматически прокручиваем в начало
+            ScrollToGraphStart();
+        }
+        
+        private void NormalizeNodePositions()
+        {
+            if (!_nodePositions.Any())
+                return;
+            
+            // Находим минимальные координаты
+            double minX = _nodePositions.Values.Min(p => p.X);
+            double minY = _nodePositions.Values.Min(p => p.Y);
+            
+            // Если узлы начинаются не с (0,0), смещаем их к началу с небольшим отступом
+            if (minX > 50 || minY > 50)
+            {
+                double offsetX = Math.Max(0, minX - 50);
+                double offsetY = Math.Max(0, minY - 50);
+                
+                // Смещаем все позиции
+                var newPositions = new Dictionary<int, Point>();
+                foreach (var kvp in _nodePositions)
+                {
+                    newPositions[kvp.Key] = new Point(kvp.Value.X - offsetX, kvp.Value.Y - offsetY);
+                }
+                _nodePositions = newPositions;
+            }
+        }
+        
+        private void ScrollToGraphStart()
+        {
+            if (ScrollViewer == null)
+                return;
+            
+            // Просто прокручиваем в начало - позиции уже нормализованы
+            ScrollViewer.ScrollToHorizontalOffset(0);
+            ScrollViewer.ScrollToVerticalOffset(0);
+            
+            // Дополнительная попытка через задержку для гарантии
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (ScrollViewer != null)
+                {
+                    ScrollViewer.ScrollToHome();
+                }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+        
+        private void ClearGraphExceptRoot()
+        {
+            var result = MessageBox.Show(
+                "Удалить все узлы кроме корня?",
+                "Очистить граф",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            
+            if (result != MessageBoxResult.Yes)
+                return;
+            
+            // Находим корень
+            var allChildren = CurrentTree.Nodes.SelectMany(n => n.Children).ToHashSet();
+            var root = CurrentTree.Nodes.FirstOrDefault(n => !allChildren.Contains(n.Id)) 
+                       ?? CurrentTree.Nodes.FirstOrDefault();
+            
+            if (root == null)
+            {
+                // Если корня нет, создаём новый
+                root = new ModelNode { Id = 0, Name = "Система", Type = NodeType.And };
+                CurrentTree.Nodes.Clear();
+                CurrentTree.Nodes.Add(root);
+            }
+            else
+            {
+                // Удаляем все узлы кроме корня
+                var nodesToDelete = CurrentTree.Nodes.Where(n => n.Id != root.Id).Select(n => n.Id).ToList();
+                
+                foreach (var nodeId in nodesToDelete)
+                {
+                    CurrentTree.Nodes.RemoveAll(n => n.Id == nodeId);
+                    _nodePositions.Remove(nodeId);
+                    _manuallyMovedNodes.Remove(nodeId);
+                }
+                
+                // Очищаем всех потомков корня
+                root.Children.Clear();
+            }
+            
+            // Сбрасываем позиции и перестраиваем граф
+            _nodePositions.Clear();
+            _manuallyMovedNodes.Clear();
+            BuildGraph();
+            ProjectData.RaiseTreeChanged();
         }
         
         private void Canvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -575,10 +749,36 @@ namespace TreeMethod.Views
                 _selectedNodeId = nodeId;
                 if (_nodeContextMenu != null)
                 {
+                    // Проверяем, есть ли место для добавления потомка
+                    bool canAddChild = CanAddChild(nodeId);
+                    var addChildItem = _nodeContextMenu.Items.OfType<MenuItem>()
+                        .FirstOrDefault(mi => mi.Name == "AddChildMenuItem");
+                    if (addChildItem != null)
+                    {
+                        addChildItem.IsEnabled = canAddChild;
+                    }
+                    
                     _nodeContextMenu.IsOpen = true;
                 }
                 e.Handled = true;
             }
+        }
+        
+        private bool CanAddChild(int parentId)
+        {
+            // Проверяем, есть ли место под родителем для нового узла
+            if (!_nodePositions.ContainsKey(parentId))
+                return true; // Если позиции нет, разрешаем (автоматически разместится)
+            
+            var parentPos = _nodePositions[parentId];
+            var canvasHeight = GraphCanvas.Height > 0 ? GraphCanvas.Height : 2000;
+            
+            // Вычисляем Y-координату нового потомка
+            var newChildY = parentPos.Y + NODE_HEIGHT + NODE_SPACING_Y;
+            
+            // Проверяем, поместится ли новый узел в Canvas
+            // Нужно место: newChildY + NODE_HEIGHT должно быть <= canvasHeight
+            return newChildY + NODE_HEIGHT <= canvasHeight;
         }
         
         private void RebuildGraph()
@@ -604,7 +804,7 @@ namespace TreeMethod.Views
         private void TryConnectNodes(int parentId, int childId)
         {
             // Валидация: один родитель на узел
-            var hasOtherParent = _tree.Nodes.Any(n => n.Children.Contains(childId) && n.Id != parentId);
+            var hasOtherParent = CurrentTree.Nodes.Any(n => n.Children.Contains(childId) && n.Id != parentId);
             if (hasOtherParent)
             {
                 MessageBox.Show("Узел уже имеет другого родителя. Строгое дерево: один родитель.", 
@@ -621,8 +821,8 @@ namespace TreeMethod.Views
                 return;
             }
 
-            var parentNode = _tree.Nodes.FirstOrDefault(n => n.Id == parentId);
-            var childNode = _tree.Nodes.FirstOrDefault(n => n.Id == childId);
+            var parentNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == parentId);
+            var childNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == childId);
             if (parentNode == null || childNode == null) return;
 
             if (!parentNode.Children.Contains(childId))
@@ -635,7 +835,7 @@ namespace TreeMethod.Views
         private HashSet<int> GetNodeWithDescendants(int nodeId)
         {
             var result = new HashSet<int> { nodeId };
-            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            var node = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             
             if (node != null)
             {
@@ -654,16 +854,16 @@ namespace TreeMethod.Views
         // Основные операции
         private void AddChild(int parentId)
         {
-            var parentNode = _tree.Nodes.First(n => n.Id == parentId);
+            var parentNode = CurrentTree.Nodes.First(n => n.Id == parentId);
             var dialog = new AddNodeDialog(parentNode);
             if (dialog.ShowDialog() == true)
             {
                 var data = dialog.NewNodeData;
-                int newId = _tree.Nodes.Any() ? _tree.Nodes.Max(n => n.Id) + 1 : 0;
+                int newId = CurrentTree.Nodes.Any() ? CurrentTree.Nodes.Max(n => n.Id) + 1 : 0;
                 var newNode = new ModelNode { Id = newId, Name = data.Name, Type = data.Type };
                 if (!parentNode.Children.Contains(newId)) 
                     parentNode.Children.Add(newId);
-                _tree.Nodes.Add(newNode);
+                CurrentTree.Nodes.Add(newNode);
                 
                 // Размещаем новый узел под родителем
                 // Если родитель был перемещён вручную, размещаем новый узел относительно его текущей позиции
@@ -702,7 +902,7 @@ namespace TreeMethod.Views
         
         private void RenameNode(int nodeId)
         {
-            var node = _tree.Nodes.First(n => n.Id == nodeId);
+            var node = CurrentTree.Nodes.First(n => n.Id == nodeId);
             var dialog = new AddNodeDialog(node, node.Name, node.Type);
             if (dialog.ShowDialog() == true)
             {
@@ -717,7 +917,7 @@ namespace TreeMethod.Views
         
         private void ChangeNodeType(int nodeId, NodeType newType)
         {
-            var modelNode = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            var modelNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (modelNode != null)
             {
                 if (newType == NodeType.Leaf && modelNode.Children.Any())
@@ -747,7 +947,7 @@ namespace TreeMethod.Views
             
             foreach (var id in nodesToDelete)
             {
-                foreach (var node in _tree.Nodes)
+                foreach (var node in CurrentTree.Nodes)
                 {
                     node.Children.RemoveAll(childId => childId == id);
                 }
@@ -755,7 +955,7 @@ namespace TreeMethod.Views
                 _manuallyMovedNodes.Remove(id); // Убираем из списка вручную перемещённых
             }
             
-            _tree.Nodes.RemoveAll(n => nodesToDelete.Contains(n.Id));
+            CurrentTree.Nodes.RemoveAll(n => nodesToDelete.Contains(n.Id));
             
             BuildGraph();
             ProjectData.RaiseTreeChanged();
@@ -776,7 +976,7 @@ namespace TreeMethod.Views
             if (MessageBox.Show("Удалить всё дерево?", "Подтверждение", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
                 return;
 
-            _tree.Nodes.Clear();
+            CurrentTree.Nodes.Clear();
             _nodePositions.Clear();
 
             var root = new ModelNode
@@ -787,7 +987,7 @@ namespace TreeMethod.Views
                 Children = new List<int>()
             };
 
-            _tree.Nodes.Add(root);
+            CurrentTree.Nodes.Add(root);
             BuildGraph();
             ProjectData.RaiseTreeChanged();
 
@@ -828,10 +1028,6 @@ namespace TreeMethod.Views
                 }
 
                 ProjectData.CurrentTree = loaded;
-                _tree.Nodes = loaded.Nodes;
-                _tree.EP = loaded.EP;
-                _tree.AP = loaded.AP;
-                _tree.GoalWeights = loaded.GoalWeights;
 
                 _nodePositions.Clear(); // Сбрасываем позиции при загрузке
                 BuildGraph();

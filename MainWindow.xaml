@@ -16,7 +16,7 @@
     </Window.Resources>
 
     <DockPanel>
-
+        <!-- Меню -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Файл">
                 <MenuItem Header="Новый проект" Command="{Binding NewProjectCommand}" />
@@ -26,34 +26,140 @@
                 <Separator />
                 <MenuItem Header="Выход" Command="{Binding ExitCommand}" />
             </MenuItem>
-
-            <MenuItem Header="_Вид">
-                <MenuItem Header="Дерево" Command="{Binding ShowTreePageCommand}" />
-                <MenuItem Header="Матрицы" Command="{Binding ShowMatricesPageCommand}" />
-                <MenuItem Header="Расчёт" Command="{Binding ShowCalculationPageCommand}" />
-                <MenuItem Header="Результаты" Command="{Binding ShowResultsPageCommand}" />
-            </MenuItem>
-
             <MenuItem Header="_Справка">
                 <MenuItem Header="О программе" Command="{Binding AboutCommand}" />
             </MenuItem>
         </Menu>
 
-
+        <!-- Панель инструментов -->
         <ToolBar DockPanel.Dock="Top" Padding="4">
             <Button Content="➕ Новый" Command="{Binding NewProjectCommand}" Margin="2" />
             <Button Content="📂 Открыть" Command="{Binding OpenCommand}" Margin="2" />
             <Button Content="💾 Сохранить" Command="{Binding SaveCommand}" Margin="2" />
-            <Separator />
-            <Button Content="▶ Запуск расчёта" Command="{Binding RunCalculationCommand}" Margin="2" />
-            <Button Content="🖼 Экспорт дерева" Command="{Binding ExportTreeCommand}" Margin="2" />
         </ToolBar>
 
+        <!-- Основной контент: TabControl + Панель расчёта -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="350" />
+            </Grid.ColumnDefinitions>
 
-        <Frame x:Name="MainFrame"
-       NavigationUIVisibility="Hidden"
-       Content="{Binding CurrentPage}"
-       JournalOwnership="OwnsJournal" />
+            <!-- Вкладки: Граф и Матрицы -->
+            <TabControl Grid.Column="0" x:Name="MainTabControl">
+                <TabItem Header="Граф">
+                    <Frame x:Name="TreeFrame"
+                           NavigationUIVisibility="Hidden"
+                           Content="{Binding TreePage}"
+                           JournalOwnership="OwnsJournal" />
+                </TabItem>
+                <TabItem Header="Матрицы">
+                    <Frame x:Name="MatricesFrame"
+                           NavigationUIVisibility="Hidden"
+                           Content="{Binding MatricesPage}"
+                           JournalOwnership="OwnsJournal" />
+                </TabItem>
+            </TabControl>
+
+            <!-- Боковая панель: Расчёт и Результаты -->
+            <Border Grid.Column="1" 
+                    BorderBrush="#CCCCCC" 
+                    BorderThickness="1,0,0,0"
+                    Background="#F5F5F5">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15" Orientation="Vertical">
+                        <!-- Заголовок -->
+                        <TextBlock Text="Расчёт и результаты"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,15" />
+
+                        <!-- Блок расчёта -->
+                        <Border BorderThickness="1"
+                                BorderBrush="#CCCCCC"
+                                CornerRadius="4"
+                                Padding="12"
+                                Background="White"
+                                Margin="0,0,0,15">
+                            <StackPanel Orientation="Vertical">
+                                <TextBlock Text="Выполнить расчёт"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Text="Запускает алгоритмы №1 и №2"
+                                           FontSize="11"
+                                           Foreground="Gray"
+                                           Margin="0,0,0,10"/>
+                                <Button Content="▶ Запустить расчёт"
+                                        Command="{Binding RunCalculationCommand}"
+                                        Height="40"
+                                        FontSize="13"
+                                        HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Блок результатов -->
+                        <Border BorderThickness="1"
+                                BorderBrush="#CCCCCC"
+                                CornerRadius="4"
+                                Padding="12"
+                                Background="White">
+                            <StackPanel Orientation="Vertical">
+                                <TextBlock Text="Результаты"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,10"/>
+
+                                <!-- Теоретическое множество -->
+                                <TextBlock Text="|RT| ="
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,5"/>
+                                <TextBox x:Name="RTResultBox"
+                                         Text="{Binding RTResult}"
+                                         IsReadOnly="True"
+                                         Background="#FAFAFA"
+                                         Padding="5"
+                                         Margin="0,0,0,15"
+                                         BorderThickness="1"
+                                         BorderBrush="#DDDDDD"/>
+
+                                <!-- Рациональные решения -->
+                                <TextBlock Text="Рациональные решения:"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,5"/>
+                                <TextBox x:Name="RationalSolutionsBox"
+                                         Text="{Binding RationalSolutions}"
+                                         IsReadOnly="True"
+                                         Background="#FAFAFA"
+                                         Padding="5"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Height="200"
+                                         BorderThickness="1"
+                                         BorderBrush="#DDDDDD"/>
+
+                                <!-- Оптимальный вариант -->
+                                <TextBlock Text="Оптимальный вариант:"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Margin="0,15,0,5"/>
+                                <TextBox x:Name="BestSolutionBox"
+                                         Text="{Binding BestSolution}"
+                                         IsReadOnly="True"
+                                         Background="#FAFAFA"
+                                         Padding="5"
+                                         Margin="0,0,0,0"
+                                         BorderThickness="1"
+                                         BorderBrush="#DDDDDD"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
 
         <!-- Строка состояния -->
         <StatusBar DockPanel.Dock="Bottom">

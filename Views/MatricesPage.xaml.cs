@@ -187,5 +187,10 @@ namespace TreeMethod.Views
             ProjectData.UpdateMatrices(ep, ap);
             MessageBox.Show("Матрицы сохранены и применены.", "Сохранение");
         }
+        
+        public void RefreshMatrices()
+        {
+            LoadMatrices();
+        }
     }
 }

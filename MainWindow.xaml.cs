@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Windows;
@@ -10,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Microsoft.Win32;
 using TreeMethod.Helpers;
 using TreeMethod.Models;
 using TreeMethod.Models.TreeMethod.Models;
@@ -33,22 +35,18 @@ namespace TreeMethod
 
     public class MainViewModel : INotifyPropertyChanged
     {
-        private Page _currentPage;
         private string _statusText = "Готово";
         private bool _isBusy;
-
-        
+        private string _rtResult = "";
+        private string _rationalSolutions = "";
+        private string _bestSolution = "";
+        private string _currentFilePath = null;
 
         public MainViewModel()
         {
             // Инициализация страниц
             TreePage = new TreePage();
             MatricesPage = new MatricesPage();
-            CalculationPage = new CalculationPage();
-            ResultsPage = new ResultsPage();
-
-            // Начальная страница
-            CurrentPage = TreePage;
 
             // Команды
             NewProjectCommand = new RelayCommand(_ => NewProject());
@@ -57,23 +55,11 @@ namespace TreeMethod
             SaveAsCommand = new RelayCommand(_ => SaveAs());
             ExitCommand = new RelayCommand(_ => Exit());
 
-            ShowTreePageCommand = new RelayCommand(_ => CurrentPage = TreePage);
-            ShowMatricesPageCommand = new RelayCommand(_ => CurrentPage = MatricesPage);
-            ShowCalculationPageCommand = new RelayCommand(_ => CurrentPage = CalculationPage);
-            ShowResultsPageCommand = new RelayCommand(_ => CurrentPage = ResultsPage);
-
             RunCalculationCommand = new RelayCommand(_ => RunCalculation());
-            ExportTreeCommand = new RelayCommand(_ => ExportTree());
             AboutCommand = new RelayCommand(_ => ShowAbout());
         }
 
         #region Свойства
-
-        public Page CurrentPage
-        {
-            get => _currentPage;
-            set { _currentPage = value; OnPropertyChanged(); }
-        }
 
         public string StatusText
         {
@@ -87,14 +73,30 @@ namespace TreeMethod
             set { _isBusy = value; OnPropertyChanged(); }
         }
 
+        public string RTResult
+        {
+            get => _rtResult;
+            set { _rtResult = value; OnPropertyChanged(); }
+        }
+
+        public string RationalSolutions
+        {
+            get => _rationalSolutions;
+            set { _rationalSolutions = value; OnPropertyChanged(); }
+        }
+
+        public string BestSolution
+        {
+            get => _bestSolution;
+            set { _bestSolution = value; OnPropertyChanged(); }
+        }
+
         #endregion
 
         #region Страницы
 
         public Page TreePage { get; }
         public Page MatricesPage { get; }
-        public Page CalculationPage { get; }
-        public Page ResultsPage { get; }
 
         #endregion
 
@@ -106,23 +108,131 @@ namespace TreeMethod
         public ICommand SaveAsCommand { get; }
         public ICommand ExitCommand { get; }
 
-        public ICommand ShowTreePageCommand { get; }
-        public ICommand ShowMatricesPageCommand { get; }
-        public ICommand ShowCalculationPageCommand { get; }
-        public ICommand ShowResultsPageCommand { get; }
-
         public ICommand RunCalculationCommand { get; }
-        public ICommand ExportTreeCommand { get; }
         public ICommand AboutCommand { get; }
 
         #endregion
 
         #region Методы команд
 
-        private void NewProject() => StatusText = "Создан новый проект";
-        private void Open() => StatusText = "Открытие проекта...";
-        private void Save() => StatusText = "Сохранение проекта...";
-        private void SaveAs() => StatusText = "Сохранение как...";
+        private void NewProject()
+        {
+            var result = MessageBox.Show(
+                "Создать новый проект? Все несохранённые изменения будут потеряны.",
+                "Новый проект",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            
+            if (result == MessageBoxResult.Yes)
+            {
+                var newTree = new TreeModel();
+                if (newTree.Nodes.Count == 0)
+                {
+                    newTree.Nodes.Add(new Node 
+                    { 
+                        Id = 0, 
+                        Name = "Система", 
+                        Type = NodeType.And 
+                    });
+                }
+                ProjectData.CurrentTree = newTree;
+                _currentFilePath = null;
+                ProjectData.RaiseTreeChanged();
+                
+                // Обновляем интерфейс
+                (TreePage as TreePage)?.RefreshGraph();
+                (MatricesPage as MatricesPage)?.RefreshMatrices();
+                
+                StatusText = "Создан новый проект";
+            }
+        }
+        
+        private void Open()
+        {
+            var dialog = new OpenFileDialog
+            {
+                Filter = "JSON файлы (*.json)|*.json|Все файлы (*.*)|*.*",
+                Title = "Открыть проект"
+            };
+            
+            if (dialog.ShowDialog() == true)
+            {
+                try
+                {
+                    var loaded = TreeModel.LoadProject(dialog.FileName);
+                    if (loaded == null)
+                    {
+                        MessageBox.Show("Ошибка загрузки: не удалось прочитать файл.", 
+                            "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    
+                    ProjectData.CurrentTree = loaded;
+                    _currentFilePath = dialog.FileName;
+                    
+                    // Обновляем интерфейс
+                    (TreePage as TreePage)?.RefreshGraph();
+                    (MatricesPage as MatricesPage)?.RefreshMatrices();
+                    
+                    ProjectData.RaiseTreeChanged();
+                    StatusText = $"Проект загружен: {System.IO.Path.GetFileName(dialog.FileName)}";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при загрузке проекта:\n{ex.Message}", 
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    StatusText = "Ошибка загрузки";
+                }
+            }
+        }
+        
+        private void Save()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath))
+            {
+                SaveAs(); // Если файл не сохранён, вызываем "Сохранить как"
+                return;
+            }
+            
+            try
+            {
+                ProjectData.CurrentTree.SaveProject(_currentFilePath);
+                StatusText = $"Проект сохранён: {System.IO.Path.GetFileName(_currentFilePath)}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при сохранении:\n{ex.Message}", 
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText = "Ошибка сохранения";
+            }
+        }
+        
+        private void SaveAs()
+        {
+            var dialog = new SaveFileDialog
+            {
+                Filter = "JSON файлы (*.json)|*.json|Все файлы (*.*)|*.*",
+                Title = "Сохранить проект как",
+                FileName = "project.json"
+            };
+            
+            if (dialog.ShowDialog() == true)
+            {
+                try
+                {
+                    ProjectData.CurrentTree.SaveProject(dialog.FileName);
+                    _currentFilePath = dialog.FileName;
+                    StatusText = $"Проект сохранён: {System.IO.Path.GetFileName(dialog.FileName)}";
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при сохранении:\n{ex.Message}", 
+                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    StatusText = "Ошибка сохранения";
+                }
+            }
+        }
+        
         private void Exit() => System.Windows.Application.Current.Shutdown();
 
         private void RunCalculation()
@@ -165,16 +275,29 @@ namespace TreeMethod
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     IsBusy = false;
-                    string msg = $"|RT| = {theoreticalCount}\nРациональные решения:\n" +
-                                 $"{string.Join("\n", rationalSolutions.Select(r => r.ToString()))}";
+                    
+                    // Обновляем результаты в боковой панели
+                    RTResult = theoreticalCount.ToString();
+                    
+                    if (rationalSolutions.Any())
+                    {
+                        var solutionsText = string.Join("\n", rationalSolutions.Select((r, idx) => 
+                            $"{idx + 1}. {string.Join(", ", r.Elements)} (оценка: {r.Score})"));
+                        RationalSolutions = solutionsText;
+                        BestSolution = rationalSolutions.First().ToString();
+                    }
+                    else
+                    {
+                        RationalSolutions = "Решения не найдены";
+                        BestSolution = "";
+                    }
+                    
                     StatusText = "Расчёт завершён";
-                    MessageBox.Show(msg, "Результаты расчёта", MessageBoxButton.OK, MessageBoxImage.Information);
                 });
             });
         }
 
 
-        private void ExportTree() => StatusText = "Экспорт дерева...";
         private void ShowAbout() => System.Windows.MessageBox.Show("И-ИЛИ Дерево\nВерсия 0.1", "О программе");
 
         #endregion

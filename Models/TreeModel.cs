@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace TreeMethod.Models
@@ -30,10 +31,40 @@ namespace TreeMethod.Models
         }
     }
 
+    // Класс для сериализации Node с правильным форматом Type
+    public class SerializableNode
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int Type { get; set; } // JSON формат: 0=And, 1=Or, 2=Leaf
+        public List<int> Children { get; set; } = new();
+        
+        public SerializableNode() { }
+        
+        public SerializableNode(Node node)
+        {
+            Id = node.Id;
+            Name = node.Name;
+            Type = NodeTypeConverter.ToJsonFormat(node.Type);
+            Children = node.Children;
+        }
+        
+        public Node ToNode()
+        {
+            return new Node
+            {
+                Id = Id,
+                Name = Name,
+                Type = NodeTypeConverter.FromJsonFormat(Type),
+                Children = Children
+            };
+        }
+    }
+
     // вспомогательный класс для сериализации
     public class SerializableTreeModel
     {
-        public List<Node> Nodes { get; set; }
+        public List<SerializableNode> Nodes { get; set; }
         public List<List<int>> EP { get; set; }
         public List<List<int>> AP { get; set; }
         public List<int> GoalWeights { get; set; }
@@ -42,7 +73,7 @@ namespace TreeMethod.Models
 
         public SerializableTreeModel(TreeModel model)
         {
-            Nodes = model.Nodes;
+            Nodes = model.Nodes.Select(n => new SerializableNode(n)).ToList();
             EP = ConvertMatrix(model.EP);
             AP = ConvertMatrix(model.AP);
             GoalWeights = model.GoalWeights != null ? new List<int>(model.GoalWeights) : new List<int>();
@@ -64,7 +95,10 @@ namespace TreeMethod.Models
 
         public TreeModel ToTreeModel()
         {
-            var model = new TreeModel { Nodes = Nodes };
+            var model = new TreeModel 
+            { 
+                Nodes = Nodes?.Select(n => n.ToNode()).ToList() ?? new List<Node>() 
+            };
             if (EP != null && EP.Count > 0)
             {
                 int rows = EP.Count;
