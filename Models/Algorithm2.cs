@@ -36,20 +36,30 @@ namespace TreeMethod.Models
 
             int features = EP.GetLength(1);
             int goals = AP.GetLength(0);
+            int epRows = EP.GetLength(0); // Получаем количество строк в матрице EP
+            int apCols = AP.GetLength(1); // Получаем количество столбцов в матрице AP
 
-            var sumFeat = new int[features];
+            // Проверяем, что количество признаков совпадает между EP и AP
+            int actualFeatures = Math.Min(features, apCols);
+
+            var sumFeat = new int[actualFeatures];
             foreach (var nodeId in activeNodeIds)
             {
                 if (!rowIndexById.TryGetValue(nodeId, out int row)) continue;
-                for (int p = 0; p < features; p++)
+                // Проверяем, что индекс строки не выходит за границы массива EP
+                if (row >= epRows) continue;
+                for (int p = 0; p < actualFeatures; p++)
                     sumFeat[p] += EP[row, p];
             }
 
             int total = 0;
             for (int g = 0; g < goals; g++)
             {
+                // Проверяем, что индекс цели не выходит за границы массива goalWeights
+                if (g >= goalWeights.Length) continue;
+                
                 int goalScore = 0;
-                for (int p = 0; p < features; p++)
+                for (int p = 0; p < actualFeatures; p++)
                     goalScore += sumFeat[p] * AP[g, p];
                 total += goalScore * goalWeights[g];
             }

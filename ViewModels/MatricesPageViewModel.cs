@@ -150,10 +150,25 @@ namespace TreeMethod.ViewModels
 
         private void UpdateGoals(int count)
         {
-            Goals.Clear();
-            foreach (var goal in Enumerable.Range(1, count).Select(i => $"A{i}"))
+            var tree = ProjectData.CurrentTree;
+            
+            // Если в дереве есть сохраненные названия целей и их количество совпадает, используем их
+            if (tree.GoalNames != null && tree.GoalNames.Count == count)
             {
-                Goals.Add(goal);
+                Goals.Clear();
+                foreach (var goalName in tree.GoalNames)
+                {
+                    Goals.Add(goalName);
+                }
+            }
+            else
+            {
+                // Иначе генерируем стандартные названия
+                Goals.Clear();
+                foreach (var goal in Enumerable.Range(1, count).Select(i => $"A{i}"))
+                {
+                    Goals.Add(goal);
+                }
             }
             OnPropertyChanged(nameof(Goals));
         }
@@ -181,7 +196,9 @@ namespace TreeMethod.ViewModels
             
             for (int i = 0; i < aCount; i++)
             {
-                var row = new MatrixRow { Name = Goals[i] };
+                // Используем имя цели из коллекции Goals, если доступно, иначе генерируем
+                var goalName = (i < Goals.Count) ? Goals[i] : $"A{i + 1}";
+                var row = new MatrixRow { Name = goalName };
                 LoadMatrixRowValues(row, tree.AP, i, pCount, Features.ToArray());
                 APRows.Add(row);
             }
@@ -219,21 +236,139 @@ namespace TreeMethod.ViewModels
             if (FeaturesCount <= 0)
             {
                 FeaturesCount = 3;
-                UpdateFeatures(3);
             }
 
             if (GoalsCount <= 0)
             {
                 GoalsCount = 2;
-                UpdateGoals(2);
             }
 
             // Применяем только если значения корректны
             if (FeaturesCount > 0 && GoalsCount > 0)
             {
-                UpdateFeatures(FeaturesCount);
-                UpdateGoals(GoalsCount);
-                LoadMatrices();
+                // Сохраняем текущие названия перед изменением размерности
+                var currentFeatureNames = Features.ToArray();
+                var currentGoalNames = Goals.ToArray();
+                
+                // Обновляем матрицы с новыми размерами (это обновит и коллекции Features/Goals)
+                ResizeMatrices(FeaturesCount, GoalsCount, currentFeatureNames, currentGoalNames);
+            }
+        }
+
+        private void ResizeMatrices(int newFeaturesCount, int newGoalsCount, string[] currentFeatureNames, string[] currentGoalNames)
+        {
+            // Генерируем новые названия признаков, сохраняя существующие
+            var newFeatureNames = new List<string>();
+            for (int i = 0; i < newFeaturesCount; i++)
+            {
+                if (i < currentFeatureNames.Length)
+                {
+                    newFeatureNames.Add(currentFeatureNames[i]);
+                }
+                else
+                {
+                    newFeatureNames.Add($"P{i + 1}");
+                }
+            }
+            
+            // Генерируем новые названия целей, сохраняя существующие
+            var newGoalNames = new List<string>();
+            for (int i = 0; i < newGoalsCount; i++)
+            {
+                if (i < currentGoalNames.Length)
+                {
+                    newGoalNames.Add(currentGoalNames[i]);
+                }
+                else
+                {
+                    newGoalNames.Add($"A{i + 1}");
+                }
+            }
+            
+            // Обновляем коллекции Features и Goals
+            Features.Clear();
+            foreach (var feature in newFeatureNames)
+            {
+                Features.Add(feature);
+            }
+            OnPropertyChanged(nameof(Features));
+            
+            Goals.Clear();
+            foreach (var goal in newGoalNames)
+            {
+                Goals.Add(goal);
+            }
+            OnPropertyChanged(nameof(Goals));
+
+            // Обновляем матрицу E×P
+            foreach (var row in EPRows)
+            {
+                // Сохраняем текущие значения
+                var currentValues = new Dictionary<string, int>();
+                foreach (var feature in currentFeatureNames)
+                {
+                    if (row.Values.ContainsKey(feature))
+                    {
+                        currentValues[feature] = row.GetValue(feature);
+                    }
+                }
+                
+                // Очищаем и добавляем значения для новых признаков
+                row.Values.Clear();
+                foreach (var feature in newFeatureNames)
+                {
+                    row.SetValue(feature, currentValues.ContainsKey(feature) ? currentValues[feature] : 0);
+                }
+                row.NotifyValuesChanged();
+            }
+
+            // Обновляем матрицу A×P
+            var oldGoalsCount = APRows.Count;
+            
+            // Добавляем или удаляем строки для соответствия новому количеству целей
+            if (newGoalsCount > oldGoalsCount)
+            {
+                // Добавляем новые строки
+                for (int i = oldGoalsCount; i < newGoalsCount; i++)
+                {
+                    var row = new MatrixRow { Name = newGoalNames[i] };
+                    foreach (var feature in newFeatureNames)
+                    {
+                        row.SetValue(feature, 0);
+                    }
+                    APRows.Add(row);
+                }
+            }
+            else if (newGoalsCount < oldGoalsCount)
+            {
+                // Удаляем лишние строки
+                while (APRows.Count > newGoalsCount)
+                {
+                    APRows.RemoveAt(APRows.Count - 1);
+                }
+            }
+            
+            // Обновляем названия строк и значения в матрице AP
+            for (int i = 0; i < APRows.Count && i < newGoalNames.Count; i++)
+            {
+                var row = APRows[i];
+                row.Name = newGoalNames[i];
+                
+                var currentValues = new Dictionary<string, int>();
+                foreach (var feature in currentFeatureNames)
+                {
+                    if (row.Values.ContainsKey(feature))
+                    {
+                        currentValues[feature] = row.GetValue(feature);
+                    }
+                }
+                
+                row.Values.Clear();
+                foreach (var feature in newFeatureNames)
+                {
+                    row.SetValue(feature, currentValues.ContainsKey(feature) ? currentValues[feature] : 0);
+                }
+                row.NotifyValuesChanged();
             }
         }
 
@@ -298,6 +433,28 @@ namespace TreeMethod.ViewModels
             
             OnPropertyChanged(nameof(Features));
         }
+        
+        // Метод для переименования цели
+        public void RenameGoal(int index, string newName)
+        {
+            if (index < 0 || index >= Goals.Count || string.IsNullOrWhiteSpace(newName))
+                return;
+                
+            var oldName = Goals[index];
+            if (oldName == newName)
+                return;
+            
+            // Обновляем название в коллекции
+            Goals[index] = newName;
+            
+            // Обновляем название в соответствующей строке матрицы AP
+            if (index < APRows.Count)
+            {
+                APRows[index].Name = newName;
+            }
+            
+            OnPropertyChanged(nameof(Goals));
+        }
 
         private int[,] ConvertRowsToMatrix(ObservableCollection<MatrixRow> rows, string[] featureNames)
         {
@@ -324,9 +481,10 @@ namespace TreeMethod.ViewModels
 
             ProjectData.UpdateMatrices(ep, ap);
             
-            // Сохраняем названия признаков
+            // Сохраняем названия признаков и целей
             var tree = ProjectData.CurrentTree;
             tree.FeatureNames = new List<string>(Features);
+            tree.GoalNames = new List<string>(Goals);
         }
     }
 }

@@ -12,6 +12,7 @@ namespace TreeMethod.Models
         public int[,] AP { get; set; }     // Матрица целей × признаки
         public int[] GoalWeights { get; set; }
         public List<string> FeatureNames { get; set; } = new(); // Названия признаков (P1, P2, ...)
+        public List<string> GoalNames { get; set; } = new(); // Названия целей (A1, A2, ...)
 
         // ===============================
         //  Сохранение / Загрузка проекта
@@ -70,6 +71,7 @@ namespace TreeMethod.Models
         public List<List<int>> AP { get; set; }
         public List<int> GoalWeights { get; set; }
         public List<string> FeatureNames { get; set; } // Названия признаков
+        public List<string> GoalNames { get; set; } // Названия целей
 
         public SerializableTreeModel() { }
 
@@ -81,6 +83,9 @@ namespace TreeMethod.Models
             GoalWeights = model.GoalWeights != null ? new List<int>(model.GoalWeights) : new List<int>();
             FeatureNames = model.FeatureNames != null && model.FeatureNames.Any() 
                 ? new List<string>(model.FeatureNames) 
+                : new List<string>();
+            GoalNames = model.GoalNames != null && model.GoalNames.Any() 
+                ? new List<string>(model.GoalNames) 
                 : new List<string>();
         }
 
@@ -107,26 +112,47 @@ namespace TreeMethod.Models
             if (EP != null && EP.Count > 0)
             {
                 int rows = EP.Count;
-                int cols = EP[0].Count;
+                // Определяем максимальное количество столбцов среди всех строк
+                int cols = EP.Max(row => row?.Count ?? 0);
+                if (cols == 0) cols = 1; // Минимум один столбец
+                
                 model.EP = new int[rows, cols];
                 for (int i = 0; i < rows; i++)
+                {
+                    int rowCols = EP[i]?.Count ?? 0;
                     for (int j = 0; j < cols; j++)
-                        model.EP[i, j] = EP[i][j];
+                    {
+                        // Если строка короче, заполняем нулями
+                        model.EP[i, j] = (j < rowCols) ? EP[i][j] : 0;
+                    }
+                }
             }
 
             if (AP != null && AP.Count > 0)
             {
                 int rows = AP.Count;
-                int cols = AP[0].Count;
+                // Определяем максимальное количество столбцов среди всех строк
+                int cols = AP.Max(row => row?.Count ?? 0);
+                if (cols == 0) cols = 1; // Минимум один столбец
+                
                 model.AP = new int[rows, cols];
                 for (int i = 0; i < rows; i++)
+                {
+                    int rowCols = AP[i]?.Count ?? 0;
                     for (int j = 0; j < cols; j++)
-                        model.AP[i, j] = AP[i][j];
+                    {
+                        // Если строка короче, заполняем нулями
+                        model.AP[i, j] = (j < rowCols) ? AP[i][j] : 0;
+                    }
+                }
             }
 
             model.GoalWeights = GoalWeights?.ToArray() ?? Array.Empty<int>();
             model.FeatureNames = FeatureNames != null && FeatureNames.Any() 
                 ? new List<string>(FeatureNames) 
+                : new List<string>();
+            model.GoalNames = GoalNames != null && GoalNames.Any() 
+                ? new List<string>(GoalNames) 
                 : new List<string>();
             return model;
         }

@@ -8,8 +8,14 @@ namespace TreeMethod.Models
         public static List<List<int>> GenerateCombinations(TreeModel tree)
         {
             var nodes = tree.Nodes;
+            if (nodes == null || nodes.Count == 0)
+                return new List<List<int>>();
+                
             var allChildren = nodes.SelectMany(n => n.Children).ToHashSet();
-            var root = nodes.FirstOrDefault(n => !allChildren.Contains(n.Id)) ?? nodes.First();
+            var root = nodes.FirstOrDefault(n => !allChildren.Contains(n.Id)) ?? nodes.FirstOrDefault();
+            
+            if (root == null)
+                return new List<List<int>>();
 
             return CombosFrom(root, nodes);
         }
@@ -23,7 +29,12 @@ namespace TreeMethod.Models
                 return new List<List<int>> { new List<int> { node.Id } };
 
             var childCombos = node.Children
-                                  .Select(id => CombosFrom(nodes.First(n => n.Id == id), nodes))
+                                  .Select(id => 
+                                  {
+                                      var childNode = nodes.FirstOrDefault(n => n.Id == id);
+                                      return childNode != null ? CombosFrom(childNode, nodes) : new List<List<int>>();
+                                  })
+                                  .Where(combo => combo.Count > 0) // Фильтруем пустые комбинации
                                   .ToList();
 
             if (node.Type == NodeType.And)

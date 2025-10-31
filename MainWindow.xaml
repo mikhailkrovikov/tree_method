@@ -146,8 +146,8 @@
                                          TextWrapping="Wrap"
                                          AcceptsReturn="True"
                                          VerticalScrollBarVisibility="Auto"
-                                         MinHeight="150"
-                                         MaxHeight="250"
+                                         MinHeight="300"
+                                         MaxHeight="500"
                                          Margin="0,0,0,16"/>
 
                                 <!-- Оптимальный вариант -->
