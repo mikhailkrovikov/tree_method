@@ -119,7 +119,7 @@ namespace TreeMethod.Models
                         model.AP[i, j] = AP[i][j];
             }
 
-            model.GoalWeights = GoalWeights?.ToArray() ?? new int[0];
+            model.GoalWeights = GoalWeights?.ToArray() ?? Array.Empty<int>();
             return model;
         }
     }

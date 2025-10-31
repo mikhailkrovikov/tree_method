@@ -1,10 +1,10 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 using TreeMethod.Models;
 
 namespace TreeMethod.Views
 {
-    // ---------- ДОПОЛНИТЕЛЬНОЕ ОКНО ----------
     public partial class AddNodeDialog : Window
     {
         public (string Name, NodeType Type) NewNodeData { get; private set; }

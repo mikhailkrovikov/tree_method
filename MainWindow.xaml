@@ -16,21 +16,6 @@
     </Window.Resources>
 
     <DockPanel>
-        <!-- Меню -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_Файл">
-                <MenuItem Header="Новый проект" Command="{Binding NewProjectCommand}" />
-                <MenuItem Header="Открыть..." Command="{Binding OpenCommand}" />
-                <MenuItem Header="Сохранить" Command="{Binding SaveCommand}" />
-                <MenuItem Header="Сохранить как..." Command="{Binding SaveAsCommand}" />
-                <Separator />
-                <MenuItem Header="Выход" Command="{Binding ExitCommand}" />
-            </MenuItem>
-            <MenuItem Header="_Справка">
-                <MenuItem Header="О программе" Command="{Binding AboutCommand}" />
-            </MenuItem>
-        </Menu>
-
         <!-- Панель инструментов -->
         <ToolBar DockPanel.Dock="Top" Padding="4">
             <Button Content="➕ Новый" Command="{Binding NewProjectCommand}" Margin="2" />

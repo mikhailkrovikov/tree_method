@@ -1,20 +1,16 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using Microsoft.Win32;
 using TreeMethod.Helpers;
 using TreeMethod.Models;
-using TreeMethod.Models.TreeMethod.Models;
 using TreeMethod.Views;
 
 namespace TreeMethod
@@ -175,7 +171,7 @@ namespace TreeMethod
                     (MatricesPage as MatricesPage)?.RefreshMatrices();
                     
                     ProjectData.RaiseTreeChanged();
-                    StatusText = $"Проект загружен: {System.IO.Path.GetFileName(dialog.FileName)}";
+                    StatusText = $"Проект загружен: {Path.GetFileName(dialog.FileName)}";
                 }
                 catch (Exception ex)
                 {
@@ -197,7 +193,7 @@ namespace TreeMethod
             try
             {
                 ProjectData.CurrentTree.SaveProject(_currentFilePath);
-                StatusText = $"Проект сохранён: {System.IO.Path.GetFileName(_currentFilePath)}";
+                    StatusText = $"Проект сохранён: {Path.GetFileName(_currentFilePath)}";
             }
             catch (Exception ex)
             {
@@ -233,18 +229,18 @@ namespace TreeMethod
             }
         }
         
-        private void Exit() => System.Windows.Application.Current.Shutdown();
+        private void Exit() => Application.Current.Shutdown();
 
         private void RunCalculation()
         {
             IsBusy = true;
             StatusText = "Выполняется расчёт...";
 
-            System.Threading.Tasks.Task.Run(() =>
+            Task.Run(() =>
             {
                 var tree = ProjectData.CurrentTree;
 
-                // 🧩 Проверка
+                // Проверка наличия дерева
                 if (tree == null || tree.Nodes.Count == 0)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -253,6 +249,7 @@ namespace TreeMethod
                     return;
                 }
 
+                // Проверка наличия матриц
                 if (tree.EP == null || tree.AP == null)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -261,44 +258,46 @@ namespace TreeMethod
                     return;
                 }
 
-                // 🧩 Автоматически подгоняем веса целей
+                // Автоматически подгоняем веса целей, если не заданы
                 if (tree.GoalWeights == null || tree.GoalWeights.Length != tree.AP.GetLength(0))
                 {
                     tree.GoalWeights = Enumerable.Repeat(1, tree.AP.GetLength(0)).ToArray();
                 }
 
+                // Выполняем расчёты
                 int theoreticalCount = Algorithm1.CalculateRT(tree);
                 var rationalSolutions = Algorithm2.FindSolutions(tree);
 
-                System.Threading.Thread.Sleep(800); // имитация задержки
-
+                // Обновляем результаты в UI
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     IsBusy = false;
-                    
-                    // Обновляем результаты в боковой панели
-                    RTResult = theoreticalCount.ToString();
-                    
-                    if (rationalSolutions.Any())
-                    {
-                        var solutionsText = string.Join("\n", rationalSolutions.Select((r, idx) => 
-                            $"{idx + 1}. {string.Join(", ", r.Elements)} (оценка: {r.Score})"));
-                        RationalSolutions = solutionsText;
-                        BestSolution = rationalSolutions.First().ToString();
-                    }
-                    else
-                    {
-                        RationalSolutions = "Решения не найдены";
-                        BestSolution = "";
-                    }
-                    
+                    UpdateCalculationResults(theoreticalCount, rationalSolutions);
                     StatusText = "Расчёт завершён";
                 });
             });
         }
+        
+        private void UpdateCalculationResults(int theoreticalCount, List<RationalSolution> rationalSolutions)
+        {
+            RTResult = theoreticalCount.ToString();
+            
+            if (rationalSolutions.Any())
+            {
+                var solutionsText = string.Join("\n", rationalSolutions.Select((r, idx) => 
+                    $"{idx + 1}. {string.Join(", ", r.Elements)} (оценка: {r.Score})"));
+                RationalSolutions = solutionsText;
+                BestSolution = rationalSolutions.First().ToString();
+            }
+            else
+            {
+                RationalSolutions = "Решения не найдены";
+                BestSolution = "";
+            }
+        }
 
 
-        private void ShowAbout() => System.Windows.MessageBox.Show("И-ИЛИ Дерево\nВерсия 0.1", "О программе");
+        private void ShowAbout() => MessageBox.Show("И-ИЛИ Дерево\nВерсия 0.1", "О программе");
 
         #endregion
 

@@ -738,8 +738,8 @@ namespace TreeMethod.Views
             _nodePositions.Clear();
             _manuallyMovedNodes.Clear();
             BuildGraph();
-            ProjectData.RaiseTreeChanged();
-        }
+                ProjectData.RaiseTreeChanged();
+            }
         
         private void Canvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -884,9 +884,9 @@ namespace TreeMethod.Views
                         .Select(sid => _nodePositions[sid].X)
                         .Max();
                     newX = rightmostSibling + NODE_SPACING_X;
-                }
-                else
-                {
+            }
+            else
+            {
                     // Если это первый потомок, центрируем под родителем
                     // Центр родителя: parentPos.X + NODE_WIDTH / 2
                     // Центр нового узла должен быть там же, значит левый край: parentPos.X
@@ -969,79 +969,5 @@ namespace TreeMethod.Views
                 e.Handled = true;
             }
         }
-        
-        // Методы для совместимости (если используются где-то)
-        private void ClearTree_Click(object sender, RoutedEventArgs e)
-        {
-            if (MessageBox.Show("Удалить всё дерево?", "Подтверждение", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
-                return;
-
-            CurrentTree.Nodes.Clear();
-            _nodePositions.Clear();
-
-            var root = new ModelNode
-            {
-                Id = 0,
-                Name = "Система",
-                Type = NodeType.And,
-                Children = new List<int>()
-            };
-
-            CurrentTree.Nodes.Add(root);
-            BuildGraph();
-            ProjectData.RaiseTreeChanged();
-
-            MessageBox.Show("Дерево очищено. Создан новый корень 'Система'.", 
-                "Готово", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void SaveTree_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string path = "project.json";
-                ProjectData.CurrentTree.SaveProject(path);
-                MessageBox.Show($"Проект сохранён в {path}", "Сохранено");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка при сохранении: {ex.Message}");
-            }
-        }
-
-        private void LoadTree_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string path = "project.json";
-                if (!File.Exists(path))
-                {
-                    MessageBox.Show("Файл project.json не найден.");
-                    return;
-                }
-
-                var loaded = TreeModel.LoadProject(path);
-                if (loaded == null)
-                {
-                    MessageBox.Show("Ошибка загрузки: пустой объект.");
-                    return;
-                }
-
-                ProjectData.CurrentTree = loaded;
-
-                _nodePositions.Clear(); // Сбрасываем позиции при загрузке
-                BuildGraph();
-
-                ProjectData.RaiseTreeChanged();
-
-                MessageBox.Show("Проект успешно загружен.", "Готово");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка загрузки: {ex.Message}", "Ошибка");
-            }
-        }
-
-        private void RedrawTree_Click(object sender, RoutedEventArgs e) => BuildGraph();
     }
 }

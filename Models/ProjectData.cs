@@ -1,5 +1,4 @@
 ﻿using System;
-using TreeMethod.Models;
 
 namespace TreeMethod.Models
 {
