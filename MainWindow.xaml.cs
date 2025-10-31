@@ -12,6 +12,7 @@ using Microsoft.Win32;
 using TreeMethod.Helpers;
 using TreeMethod.Models;
 using TreeMethod.Views;
+using TreeMethod.ViewModels;
 
 namespace TreeMethod
 {
@@ -184,23 +185,8 @@ namespace TreeMethod
         
         private void Save()
         {
-            if (string.IsNullOrEmpty(_currentFilePath))
-            {
-                SaveAs(); // Если файл не сохранён, вызываем "Сохранить как"
-                return;
-            }
-            
-            try
-            {
-                ProjectData.CurrentTree.SaveProject(_currentFilePath);
-                    StatusText = $"Проект сохранён: {Path.GetFileName(_currentFilePath)}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Ошибка при сохранении:\n{ex.Message}", 
-                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                StatusText = "Ошибка сохранения";
-            }
+            // Всегда показываем диалог сохранения
+            SaveAs();
         }
         
         private void SaveAs()
@@ -216,6 +202,18 @@ namespace TreeMethod
             {
                 try
                 {
+                    // Сохраняем матрицы и FeatureNames перед сохранением проекта
+                    var matricesPage = MatricesPage;
+                    if (matricesPage != null)
+                    {
+                        var matricesViewModel = matricesPage.DataContext as MatricesPageViewModel;
+                        if (matricesViewModel != null)
+                        {
+                            // Сохраняем матрицы и FeatureNames
+                            matricesViewModel.SaveAllMatricesData();
+                        }
+                    }
+                    
                     ProjectData.CurrentTree.SaveProject(dialog.FileName);
                     _currentFilePath = dialog.FileName;
                     StatusText = $"Проект сохранён: {System.IO.Path.GetFileName(dialog.FileName)}";

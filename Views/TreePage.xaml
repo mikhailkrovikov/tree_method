@@ -4,19 +4,25 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       mc:Ignorable="d"
-      Title="TreePage">
+      Title="TreePage"
+      Background="{StaticResource BackgroundLight}">
 
-    <Grid Background="#FFF">
+    <Grid HorizontalAlignment="Stretch" 
+          VerticalAlignment="Stretch">
         <ScrollViewer x:Name="ScrollViewer" 
                       HorizontalScrollBarVisibility="Auto" 
                       VerticalScrollBarVisibility="Auto"
-                      Background="White">
-            <Canvas x:Name="GraphCanvas" 
-                    Background="White"
-                    Width="2000"
-                    Height="1000">
-                <!-- Размер Canvas будет обновляться динамически -->
-            </Canvas>
+                      Background="{StaticResource BackgroundLight}">
+            <Border BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="2"
+                    Background="{StaticResource BackgroundWhite}">
+                <Canvas x:Name="GraphCanvas" 
+                        Background="{StaticResource BackgroundWhite}"
+                        Width="2000"
+                        Height="1500">
+                    <!-- Размер Canvas будет обновляться динамически -->
+                </Canvas>
+            </Border>
         </ScrollViewer>
     </Grid>
 </Page>

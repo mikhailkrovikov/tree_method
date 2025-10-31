@@ -146,12 +146,13 @@ namespace TreeMethod.Views
             double maxX = _nodePositions.Values.Max(p => p.X) + NODE_WIDTH;
             double maxY = _nodePositions.Values.Max(p => p.Y) + NODE_HEIGHT;
             
-            // Добавляем отступы по краям
+            // Добавляем отступы по краям (больше сверху для комфортной работы)
             const double padding = 100;
+            const double topPadding = 270; // Больший отступ сверху (~3 см дополнительно)
             
             // Canvas должен быть достаточно большим, чтобы вместить все узлы
             double requiredWidth = maxX + padding;
-            double requiredHeight = maxY + padding;
+            double requiredHeight = maxY + topPadding;
             
             // Если есть узлы с отрицательными координатами, добавляем место слева/сверху
             if (minX < 0)
@@ -159,9 +160,9 @@ namespace TreeMethod.Views
             if (minY < 0)
                 requiredHeight += Math.Abs(minY) + padding;
             
-            // Минимальный размер
+            // Минимальный размер (увеличена высота для большего пространства)
             const double minWidth = 800;
-            const double minHeight = 600;
+            const double minHeight = 1000;
             
             GraphCanvas.Width = Math.Max(minWidth, requiredWidth);
             GraphCanvas.Height = Math.Max(minHeight, requiredHeight);
@@ -181,7 +182,7 @@ namespace TreeMethod.Views
                 rootNode = CurrentTree.Nodes[0]; // Если не нашли, берём первый
             
             var startX = 1000.0; // Центр Canvas
-            var startY = 100.0;
+            var startY = 310.0; // Увеличено еще на ~3 см для большего пространства сверху
             
             // Сначала вычисляем ширину каждого поддерева
             var subtreeWidths = new Dictionary<int, double>();
@@ -588,17 +589,17 @@ namespace TreeMethod.Views
             };
 
             var changeTypeMenu = new MenuItem { Header = "Изменить тип" };
-            var typeAndItem = new MenuItem { Header = "AND" };
+            var typeAndItem = new MenuItem { Header = "И" };
             typeAndItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.And);
             };
-            var typeOrItem = new MenuItem { Header = "OR" };
+            var typeOrItem = new MenuItem { Header = "ИЛИ" };
             typeOrItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.Or);
             };
-            var typeLeafItem = new MenuItem { Header = "LEAF" };
+            var typeLeafItem = new MenuItem { Header = "Висячий", Name = "TypeLeafMenuItem" };
             typeLeafItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.Leaf);
@@ -607,7 +608,7 @@ namespace TreeMethod.Views
             changeTypeMenu.Items.Add(typeOrItem);
             changeTypeMenu.Items.Add(typeLeafItem);
             
-            var deleteItem = new MenuItem { Header = "Удалить" };
+            var deleteItem = new MenuItem { Header = "Удалить", Name = "DeleteMenuItem" };
             deleteItem.Click += (s, e) =>
             {
                 if (_selectedNodeId.HasValue) DeleteNode(_selectedNodeId.Value);
@@ -758,6 +759,28 @@ namespace TreeMethod.Views
                         addChildItem.IsEnabled = canAddChild;
                     }
                     
+                    // Отключаем удаление для корня
+                    var deleteItem = _nodeContextMenu.Items.OfType<MenuItem>()
+                        .FirstOrDefault(mi => mi.Name == "DeleteMenuItem");
+                    if (deleteItem != null)
+                    {
+                        deleteItem.IsEnabled = nodeId != 0;
+                    }
+                    
+                    // Отключаем "Висячий" для узлов с потомками
+                    var changeTypeMenu = _nodeContextMenu.Items.OfType<MenuItem>()
+                        .FirstOrDefault(mi => mi.Header?.ToString() == "Изменить тип");
+                    if (changeTypeMenu != null)
+                    {
+                        var typeLeafItem = changeTypeMenu.Items.OfType<MenuItem>()
+                            .FirstOrDefault(mi => mi.Name == "TypeLeafMenuItem");
+                        if (typeLeafItem != null)
+                        {
+                            var node = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+                            typeLeafItem.IsEnabled = node != null && !node.Children.Any();
+                        }
+                    }
+                    
                     _nodeContextMenu.IsOpen = true;
                 }
                 e.Handled = true;
@@ -766,6 +789,11 @@ namespace TreeMethod.Views
         
         private bool CanAddChild(int parentId)
         {
+            // Проверяем тип узла - к Leaf узлам нельзя добавлять потомков
+            var parentNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == parentId);
+            if (parentNode == null || parentNode.Type == NodeType.Leaf)
+                return false;
+            
             // Проверяем, есть ли место под родителем для нового узла
             if (!_nodePositions.ContainsKey(parentId))
                 return true; // Если позиции нет, разрешаем (автоматически разместится)
@@ -807,8 +835,7 @@ namespace TreeMethod.Views
             var hasOtherParent = CurrentTree.Nodes.Any(n => n.Children.Contains(childId) && n.Id != parentId);
             if (hasOtherParent)
             {
-                MessageBox.Show("Узел уже имеет другого родителя. Строгое дерево: один родитель.", 
-                    "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // Тихо игнорируем - соединение невозможно
                 return;
             }
             
@@ -816,8 +843,7 @@ namespace TreeMethod.Views
             var descendantsOfChild = GetNodeWithDescendants(childId);
             if (descendantsOfChild.Contains(parentId))
             {
-                MessageBox.Show("Создание цикла запрещено.", 
-                    "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // Тихо игнорируем - создание цикла невозможно
                 return;
             }
 
@@ -855,6 +881,14 @@ namespace TreeMethod.Views
         private void AddChild(int parentId)
         {
             var parentNode = CurrentTree.Nodes.First(n => n.Id == parentId);
+            
+            // Проверяем, что к узлу типа Leaf нельзя добавлять потомков
+            // Проверка уже выполняется через CanAddChild, которая отключает пункт меню
+            if (parentNode.Type == NodeType.Leaf)
+            {
+                return;
+            }
+            
             var dialog = new AddNodeDialog(parentNode);
             if (dialog.ShowDialog() == true)
             {
@@ -920,10 +954,9 @@ namespace TreeMethod.Views
             var modelNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (modelNode != null)
             {
+                // Проверка уже выполняется через отключение пункта меню
                 if (newType == NodeType.Leaf && modelNode.Children.Any())
                 {
-                    MessageBox.Show("Нельзя установить тип Leaf: у узла есть потомки.", 
-                        "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
                 modelNode.Type = newType;
@@ -937,9 +970,9 @@ namespace TreeMethod.Views
         
         private void DeleteNode(int nodeId)
         {
+            // Проверка уже выполняется через отключение пункта меню
             if (nodeId == 0)
             {
-                MessageBox.Show("Нельзя удалить корень!");
                 return;
             }
             

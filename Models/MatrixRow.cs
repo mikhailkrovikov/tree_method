@@ -55,5 +55,11 @@ namespace TreeMethod.Models
             if (handler != null)
                 handler(this, new PropertyChangedEventArgs(propertyName));
         }
+        
+        // Публичный метод для обновления Values извне
+        public void NotifyValuesChanged()
+        {
+            OnPropertyChanged(nameof(Values));
+        }
     }
 }

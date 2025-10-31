@@ -6,157 +6,167 @@
         xmlns:local="clr-namespace:TreeMethod.Helpers"
         mc:Ignorable="d"
         Title="И-ИЛИ Дерево"
-        Height="1080" Width="1920"
+        MinHeight="600" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized"
-        ResizeMode="NoResize">
+        Background="{StaticResource BackgroundLight}">
 
     <Window.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </Window.Resources>
 
-    <DockPanel>
+    <DockPanel Background="{StaticResource BackgroundWhite}">
         <!-- Панель инструментов -->
-        <ToolBar DockPanel.Dock="Top" Padding="4">
-            <Button Content="➕ Новый" Command="{Binding NewProjectCommand}" Margin="2" />
-            <Button Content="📂 Открыть" Command="{Binding OpenCommand}" Margin="2" />
-            <Button Content="💾 Сохранить" Command="{Binding SaveCommand}" Margin="2" />
-        </ToolBar>
+        <Border DockPanel.Dock="Top" 
+                Background="{StaticResource BackgroundWhite}"
+                BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="0,0,0,1"
+                Padding="10,8">
+            <StackPanel Orientation="Horizontal">
+                <Button Content="➕ Новый проект" 
+                        Command="{Binding NewProjectCommand}" 
+                        Style="{StaticResource ToolBarButton}"
+                        Margin="0,0,8,0" />
+                <Button Content="📂 Открыть" 
+                        Command="{Binding OpenCommand}" 
+                        Style="{StaticResource ToolBarButton}"
+                        Margin="0,0,8,0" />
+                <Button Content="💾 Сохранить" 
+                        Command="{Binding SaveCommand}" 
+                        Style="{StaticResource ToolBarButton}" />
+            </StackPanel>
+        </Border>
 
         <!-- Основной контент: TabControl + Панель расчёта -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="350" />
+                <ColumnDefinition Width="*" MinWidth="600" />
+                <ColumnDefinition Width="380" MinWidth="320" MaxWidth="450" />
             </Grid.ColumnDefinitions>
 
             <!-- Вкладки: Граф и Матрицы -->
-            <TabControl Grid.Column="0" x:Name="MainTabControl">
-                <TabItem Header="Граф">
+            <TabControl Grid.Column="0" 
+                       x:Name="MainTabControl"
+                       Style="{StaticResource ModernTabControl}">
+                <TabItem Header="Граф" Style="{StaticResource ModernTabItem}">
                     <Frame x:Name="TreeFrame"
                            NavigationUIVisibility="Hidden"
                            Content="{Binding TreePage}"
-                           JournalOwnership="OwnsJournal" />
+                           JournalOwnership="OwnsJournal"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Stretch" />
                 </TabItem>
-                <TabItem Header="Матрицы">
+                <TabItem Header="Матрицы" Style="{StaticResource ModernTabItem}">
                     <Frame x:Name="MatricesFrame"
                            NavigationUIVisibility="Hidden"
                            Content="{Binding MatricesPage}"
-                           JournalOwnership="OwnsJournal" />
+                           JournalOwnership="OwnsJournal"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Stretch" />
                 </TabItem>
             </TabControl>
 
             <!-- Боковая панель: Расчёт и Результаты -->
             <Border Grid.Column="1" 
-                    BorderBrush="#CCCCCC" 
+                    BorderBrush="{StaticResource BorderColor}" 
                     BorderThickness="1,0,0,0"
-                    Background="#F5F5F5">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="15" Orientation="Vertical">
+                    Background="{StaticResource BackgroundLight}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="20" Orientation="Vertical">
                         <!-- Заголовок -->
                         <TextBlock Text="Расчёт и результаты"
                                    FontSize="18"
                                    FontWeight="Bold"
-                                   Margin="0,0,0,15" />
+                                   Foreground="{StaticResource TextPrimary}"
+                                   Margin="0,0,0,20" />
 
                         <!-- Блок расчёта -->
                         <Border BorderThickness="1"
-                                BorderBrush="#CCCCCC"
-                                CornerRadius="4"
-                                Padding="12"
-                                Background="White"
-                                Margin="0,0,0,15">
+                                BorderBrush="{StaticResource BorderColor}"
+                                CornerRadius="8"
+                                Padding="16"
+                                Background="{StaticResource BackgroundWhite}"
+                                Margin="0,0,0,20">
                             <StackPanel Orientation="Vertical">
                                 <TextBlock Text="Выполнить расчёт"
-                                           FontSize="14"
+                                           FontSize="15"
                                            FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimary}"
                                            Margin="0,0,0,8"/>
                                 <TextBlock Text="Запускает алгоритмы №1 и №2"
-                                           FontSize="11"
-                                           Foreground="Gray"
-                                           Margin="0,0,0,10"/>
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           Margin="0,0,0,12"/>
                                 <Button Content="▶ Запустить расчёт"
                                         Command="{Binding RunCalculationCommand}"
-                                        Height="40"
-                                        FontSize="13"
+                                        Style="{StaticResource ModernButton}"
+                                        Height="42"
                                         HorizontalAlignment="Stretch" />
                             </StackPanel>
                         </Border>
 
                         <!-- Блок результатов -->
                         <Border BorderThickness="1"
-                                BorderBrush="#CCCCCC"
-                                CornerRadius="4"
-                                Padding="12"
-                                Background="White">
+                                BorderBrush="{StaticResource BorderColor}"
+                                CornerRadius="8"
+                                Padding="16"
+                                Background="{StaticResource BackgroundWhite}">
                             <StackPanel Orientation="Vertical">
                                 <TextBlock Text="Результаты"
-                                           FontSize="14"
+                                           FontSize="15"
                                            FontWeight="SemiBold"
-                                           Margin="0,0,0,10"/>
+                                           Foreground="{StaticResource TextPrimary}"
+                                           Margin="0,0,0,12"/>
 
                                 <!-- Теоретическое множество -->
                                 <TextBlock Text="|RT| ="
-                                           FontSize="12"
+                                           FontSize="13"
                                            FontWeight="SemiBold"
-                                           Margin="0,0,0,5"/>
+                                           Foreground="{StaticResource TextPrimary}"
+                                           Margin="0,0,0,6"/>
                                 <TextBox x:Name="RTResultBox"
                                          Text="{Binding RTResult}"
                                          IsReadOnly="True"
-                                         Background="#FAFAFA"
-                                         Padding="5"
-                                         Margin="0,0,0,15"
-                                         BorderThickness="1"
-                                         BorderBrush="#DDDDDD"/>
+                                         Style="{StaticResource ModernTextBox}"
+                                         Background="{StaticResource BackgroundLight}"
+                                         Margin="0,0,0,16"/>
 
                                 <!-- Рациональные решения -->
                                 <TextBlock Text="Рациональные решения:"
-                                           FontSize="12"
+                                           FontSize="13"
                                            FontWeight="SemiBold"
-                                           Margin="0,0,0,5"/>
+                                           Foreground="{StaticResource TextPrimary}"
+                                           Margin="0,0,0,6"/>
                                 <TextBox x:Name="RationalSolutionsBox"
                                          Text="{Binding RationalSolutions}"
                                          IsReadOnly="True"
-                                         Background="#FAFAFA"
-                                         Padding="5"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Background="{StaticResource BackgroundLight}"
                                          TextWrapping="Wrap"
                                          AcceptsReturn="True"
                                          VerticalScrollBarVisibility="Auto"
-                                         Height="200"
-                                         BorderThickness="1"
-                                         BorderBrush="#DDDDDD"/>
+                                         MinHeight="150"
+                                         MaxHeight="250"
+                                         Margin="0,0,0,16"/>
 
                                 <!-- Оптимальный вариант -->
                                 <TextBlock Text="Оптимальный вариант:"
-                                           FontSize="12"
+                                           FontSize="13"
                                            FontWeight="SemiBold"
-                                           Margin="0,15,0,5"/>
+                                           Foreground="{StaticResource TextPrimary}"
+                                           Margin="0,0,0,6"/>
                                 <TextBox x:Name="BestSolutionBox"
                                          Text="{Binding BestSolution}"
                                          IsReadOnly="True"
-                                         Background="#FAFAFA"
-                                         Padding="5"
-                                         Margin="0,0,0,0"
-                                         BorderThickness="1"
-                                         BorderBrush="#DDDDDD"/>
+                                         Style="{StaticResource ModernTextBox}"
+                                         Background="{StaticResource BackgroundLight}"
+                                         Margin="0,0,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
         </Grid>
-
-        <!-- Строка состояния -->
-        <StatusBar DockPanel.Dock="Bottom">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
-            </StatusBarItem>
-            <StatusBarItem HorizontalAlignment="Right">
-                <ProgressBar Width="150"
-                     Height="16"
-                     IsIndeterminate="True"
-                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}" />
-            </StatusBarItem>
-        </StatusBar>
     </DockPanel>
 </Window>

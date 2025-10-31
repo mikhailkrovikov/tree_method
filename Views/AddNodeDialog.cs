@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using TreeMethod.Models;
@@ -31,8 +32,19 @@ namespace TreeMethod.Views
 
             panel.Children.Add(new TextBlock { Text = "Тип узла:" });
             var typeBox = new ComboBox { Margin = new Thickness(0, 0, 0, 15), Height = 28 };
-            typeBox.ItemsSource = Enum.GetValues(typeof(NodeType));
-            typeBox.SelectedItem = existingType;
+            
+            // Создаем словарь для отображения русских названий типов
+            var typeItems = new List<KeyValuePair<NodeType, string>>
+            {
+                new KeyValuePair<NodeType, string>(NodeType.And, "И"),
+                new KeyValuePair<NodeType, string>(NodeType.Or, "ИЛИ"),
+                new KeyValuePair<NodeType, string>(NodeType.Leaf, "Висячий")
+            };
+            
+            typeBox.ItemsSource = typeItems;
+            typeBox.DisplayMemberPath = "Value";
+            typeBox.SelectedValuePath = "Key";
+            typeBox.SelectedValue = existingType;
             panel.Children.Add(typeBox);
 
             var okButton = new Button { Content = "✅ OK", Width = 100, Height = 32, HorizontalAlignment = HorizontalAlignment.Center };
@@ -44,8 +56,15 @@ namespace TreeMethod.Views
                     return;
                 }
 
-                NewNodeData = (nameBox.Text, (NodeType)typeBox.SelectedItem);
-                DialogResult = true;
+                if (typeBox.SelectedValue is NodeType selectedType)
+                {
+                    NewNodeData = (nameBox.Text, selectedType);
+                    DialogResult = true;
+                }
+                else
+                {
+                    MessageBox.Show("Выберите тип узла.");
+                }
             };
 
             panel.Children.Add(okButton);

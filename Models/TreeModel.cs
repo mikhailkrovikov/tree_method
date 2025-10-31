@@ -11,6 +11,7 @@ namespace TreeMethod.Models
         public int[,] EP { get; set; }     // Матрица элементов × признаки
         public int[,] AP { get; set; }     // Матрица целей × признаки
         public int[] GoalWeights { get; set; }
+        public List<string> FeatureNames { get; set; } = new(); // Названия признаков (P1, P2, ...)
 
         // ===============================
         //  Сохранение / Загрузка проекта
@@ -68,6 +69,7 @@ namespace TreeMethod.Models
         public List<List<int>> EP { get; set; }
         public List<List<int>> AP { get; set; }
         public List<int> GoalWeights { get; set; }
+        public List<string> FeatureNames { get; set; } // Названия признаков
 
         public SerializableTreeModel() { }
 
@@ -77,6 +79,9 @@ namespace TreeMethod.Models
             EP = ConvertMatrix(model.EP);
             AP = ConvertMatrix(model.AP);
             GoalWeights = model.GoalWeights != null ? new List<int>(model.GoalWeights) : new List<int>();
+            FeatureNames = model.FeatureNames != null && model.FeatureNames.Any() 
+                ? new List<string>(model.FeatureNames) 
+                : new List<string>();
         }
 
         private static List<List<int>> ConvertMatrix(int[,] matrix)
@@ -120,6 +125,9 @@ namespace TreeMethod.Models
             }
 
             model.GoalWeights = GoalWeights?.ToArray() ?? Array.Empty<int>();
+            model.FeatureNames = FeatureNames != null && FeatureNames.Any() 
+                ? new List<string>(FeatureNames) 
+                : new List<string>();
             return model;
         }
     }

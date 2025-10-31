@@ -125,10 +125,25 @@ namespace TreeMethod.ViewModels
 
         private void UpdateFeatures(int count)
         {
-            Features.Clear();
-            foreach (var feature in Enumerable.Range(1, count).Select(i => $"P{i}"))
+            var tree = ProjectData.CurrentTree;
+            
+            // Если в дереве есть сохраненные названия признаков и их количество совпадает, используем их
+            if (tree.FeatureNames != null && tree.FeatureNames.Count == count)
             {
-                Features.Add(feature);
+                Features.Clear();
+                foreach (var featureName in tree.FeatureNames)
+                {
+                    Features.Add(featureName);
+                }
+            }
+            else
+            {
+                // Иначе генерируем стандартные названия
+                Features.Clear();
+                foreach (var feature in Enumerable.Range(1, count).Select(i => $"P{i}"))
+                {
+                    Features.Add(feature);
+                }
             }
             OnPropertyChanged(nameof(Features));
         }
@@ -200,25 +215,26 @@ namespace TreeMethod.ViewModels
 
         private void ApplySizes()
         {
+            // Автоматически корректируем неверные значения без показа ошибки
             if (FeaturesCount <= 0)
             {
-                System.Windows.MessageBox.Show("Введите количество признаков (P > 0)", "Ошибка");
                 FeaturesCount = 3;
                 UpdateFeatures(3);
-                return;
             }
 
             if (GoalsCount <= 0)
             {
-                System.Windows.MessageBox.Show("Введите количество целей (A > 0)", "Ошибка");
                 GoalsCount = 2;
                 UpdateGoals(2);
-                return;
             }
 
-            UpdateFeatures(FeaturesCount);
-            UpdateGoals(GoalsCount);
-            LoadMatrices();
+            // Применяем только если значения корректны
+            if (FeaturesCount > 0 && GoalsCount > 0)
+            {
+                UpdateFeatures(FeaturesCount);
+                UpdateGoals(GoalsCount);
+                LoadMatrices();
+            }
         }
 
         public bool ValidateMatrixValue(string input)
@@ -236,7 +252,51 @@ namespace TreeMethod.ViewModels
             var ap = ConvertRowsToMatrix(APRows, Features.ToArray());
 
             ProjectData.UpdateMatrices(ep, ap);
-            System.Windows.MessageBox.Show("Матрицы сохранены и применены.", "Сохранение");
+            
+            // Сохраняем названия признаков
+            var tree = ProjectData.CurrentTree;
+            tree.FeatureNames = new List<string>(Features);
+            
+            // Матрицы сохранены тихо, без уведомления
+        }
+        
+        // Метод для переименования признака
+        public void RenameFeature(int index, string newName)
+        {
+            if (index < 0 || index >= Features.Count || string.IsNullOrWhiteSpace(newName))
+                return;
+                
+            var oldName = Features[index];
+            if (oldName == newName)
+                return;
+            
+            // Обновляем название в коллекции
+            Features[index] = newName;
+            
+            // Переименовываем ключи во всех строках матриц
+            foreach (var row in EPRows)
+            {
+                if (row.Values.ContainsKey(oldName))
+                {
+                    var value = row.Values[oldName];
+                    row.Values.Remove(oldName);
+                    row.Values[newName] = value;
+                    row.NotifyValuesChanged();
+                }
+            }
+            
+            foreach (var row in APRows)
+            {
+                if (row.Values.ContainsKey(oldName))
+                {
+                    var value = row.Values[oldName];
+                    row.Values.Remove(oldName);
+                    row.Values[newName] = value;
+                    row.NotifyValuesChanged();
+                }
+            }
+            
+            OnPropertyChanged(nameof(Features));
         }
 
         private int[,] ConvertRowsToMatrix(ObservableCollection<MatrixRow> rows, string[] featureNames)
@@ -254,6 +314,19 @@ namespace TreeMethod.ViewModels
             }
 
             return matrix;
+        }
+        
+        // Публичный метод для сохранения всех данных матриц
+        public void SaveAllMatricesData()
+        {
+            var ep = ConvertRowsToMatrix(EPRows, Features.ToArray());
+            var ap = ConvertRowsToMatrix(APRows, Features.ToArray());
+
+            ProjectData.UpdateMatrices(ep, ap);
+            
+            // Сохраняем названия признаков
+            var tree = ProjectData.CurrentTree;
+            tree.FeatureNames = new List<string>(Features);
         }
     }
 }

@@ -4,55 +4,112 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       mc:Ignorable="d"
-      Title="MatricesPage">
+      Title="MatricesPage"
+      Background="{StaticResource BackgroundLight}">
 
-    <Grid Background="#FFF" Width="1920" Height="1000">
+    <Grid HorizontalAlignment="Stretch" 
+          VerticalAlignment="Stretch">
         <DockPanel>
-            <TextBlock Text="Редактирование матриц"
-                       FontSize="24"
-                       FontWeight="Bold"
-                       Margin="20"
-                       DockPanel.Dock="Top" />
+            <!-- Заголовок -->
+            <Border DockPanel.Dock="Top"
+                    Background="{StaticResource BackgroundWhite}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="0,0,0,1"
+                    Padding="24,16">
+                <TextBlock Text="Редактирование матриц"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimary}"/>
+            </Border>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="20" Orientation="Vertical" VerticalAlignment="Top">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                          HorizontalScrollBarVisibility="Auto"
+                          Padding="24">
+                <StackPanel Orientation="Vertical">
 
                     <!-- Панель управления -->
-                    <StackPanel Orientation="Horizontal" Margin="10,0,0,10">
-                        <TextBlock Text="Количество признаков (P):" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBox x:Name="PCountBox" Text="{Binding FeaturesCount, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="0,0,20,0"/>
+                    <Border Background="{StaticResource BackgroundWhite}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="16"
+                            Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Количество признаков (P):" 
+                                      VerticalAlignment="Center" 
+                                      Foreground="{StaticResource TextPrimary}"
+                                      FontSize="13"
+                                      Margin="0,0,8,0"/>
+                            <TextBox x:Name="PCountBox" 
+                                    Text="{Binding FeaturesCount, UpdateSourceTrigger=PropertyChanged}" 
+                                    Style="{StaticResource ModernTextBox}"
+                                    Width="70" 
+                                    Margin="0,0,24,0"/>
 
-                        <TextBlock Text="Количество целей (A):" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBox x:Name="ACountBox" Text="{Binding GoalsCount, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="0,0,12,0"/>
+                            <TextBlock Text="Количество целей (A):" 
+                                      VerticalAlignment="Center" 
+                                      Foreground="{StaticResource TextPrimary}"
+                                      FontSize="13"
+                                      Margin="0,0,8,0"/>
+                            <TextBox x:Name="ACountBox" 
+                                    Text="{Binding GoalsCount, UpdateSourceTrigger=PropertyChanged}" 
+                                    Style="{StaticResource ModernTextBox}"
+                                    Width="70" 
+                                    Margin="0,0,16,0"/>
 
-                        <Button Content="Применить" Command="{Binding ApplySizesCommand}" Width="100"/>
-                    </StackPanel>
+                            <Button Content="Применить" 
+                                   Command="{Binding ApplySizesCommand}" 
+                                   Style="{StaticResource ModernButton}"
+                                   Padding="16,8"
+                                   MinWidth="100"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Матрица E×P -->
                     <TextBlock Text="Матрица соответствий E×P (элементы × признаки)"
-                               FontWeight="SemiBold" FontSize="16" Margin="0,0,0,10"/>
-                    <DataGrid x:Name="EPGrid"
-                              AutoGenerateColumns="False"
-                              ItemsSource="{Binding EPRows}"
-                              CellEditEnding="EPGrid_CellEditEnding"
-                              Margin="0,5,0,10" />
-
+                               FontWeight="SemiBold" 
+                               FontSize="16" 
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,0,12"/>
+                    <Border BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Background="{StaticResource BackgroundWhite}"
+                            Margin="0,0,0,24">
+                        <DataGrid x:Name="EPGrid"
+                                  AutoGenerateColumns="False"
+                                  ItemsSource="{Binding EPRows}"
+                                  CellEditEnding="EPGrid_CellEditEnding"
+                                  HeadersVisibility="Column"
+                                  BorderThickness="0"
+                                  GridLinesVisibility="All"
+                                  Background="{StaticResource BackgroundWhite}"
+                                  RowBackground="{StaticResource BackgroundWhite}"
+                                  AlternatingRowBackground="{StaticResource BackgroundLight}"/>
+                    </Border>
 
                     <!-- Матрица A×P -->
                     <TextBlock Text="Матрица целей A×P (цели × признаки)"
-                               FontWeight="SemiBold" FontSize="16" Margin="0,0,0,10"/>
-                    <DataGrid x:Name="APGrid"
-                              AutoGenerateColumns="False"
-                              ItemsSource="{Binding APRows}"
-                              CellEditEnding="APGrid_CellEditEnding"
-                              Margin="0,5,0,10" />
-
-
-                    <!-- Кнопка сохранения -->
-                    <Button Content="💾 Сохранить изменения"
-                            Width="250"
-                            Height="40"
-                            Command="{Binding SaveMatricesCommand}"/>
+                               FontWeight="SemiBold" 
+                               FontSize="16" 
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,0,12"/>
+                    <Border BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Background="{StaticResource BackgroundWhite}"
+                            Margin="0,0,0,24">
+                        <DataGrid x:Name="APGrid"
+                                  AutoGenerateColumns="False"
+                                  ItemsSource="{Binding APRows}"
+                                  CellEditEnding="APGrid_CellEditEnding"
+                                  HeadersVisibility="Column"
+                                  BorderThickness="0"
+                                  GridLinesVisibility="All"
+                                  Background="{StaticResource BackgroundWhite}"
+                                  RowBackground="{StaticResource BackgroundWhite}"
+                                  AlternatingRowBackground="{StaticResource BackgroundLight}"/>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>
