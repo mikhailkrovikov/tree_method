@@ -5,15 +5,10 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Controls.Primitives;
- 
-using Microsoft.Msagl.Drawing;
-using Microsoft.Msagl.GraphViewerGdi;
-using System.Windows.Forms.Integration;
-using System.Windows.Forms;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using TreeMethod.Models;
 using ModelNode = TreeMethod.Models.Node;
-using Color = Microsoft.Msagl.Drawing.Color;
 
 namespace TreeMethod.Views
 {
@@ -21,11 +16,39 @@ namespace TreeMethod.Views
     {
         private readonly TreeModel _tree = ProjectData.CurrentTree;
  
-        private GViewer _viewer;
-        private System.Windows.Forms.ContextMenuStrip _contextMenuStrip;
+        // Словари для хранения UI элементов
+        private Dictionary<int, Border> _nodeBorders = new(); // Border - контейнер узла
+        private Dictionary<int, TextBlock> _nodeLabels = new(); // TextBlock - текст узла
+        private Dictionary<string, Polyline> _edges = new(); // Рёбра между узлами
+        
+        // Позиции узлов на Canvas
+        private Dictionary<int, Point> _nodePositions = new();
+        
+        // Узлы, которые были перемещены вручную (не должны пересчитываться автоматически)
+        private HashSet<int> _manuallyMovedNodes = new();
+        
+        // Состояние для перетаскивания
+        private bool _isDragging = false;
+        private int? _draggedNodeId = null;
+        private Point _dragStartPoint;
+        private Point _nodeStartPosition;
+        
+        // Состояние для соединения узлов
         private bool _isConnecting = false;
         private int? _connectSourceId = null;
-        private int? _nodeUnderCursorId = null;
+        
+        // Текущий выбранный узел для контекстного меню
+        private int? _selectedNodeId = null;
+        
+        // Контекстное меню для узлов
+        private ContextMenu _nodeContextMenu;
+        
+        // Константы для отрисовки
+        private const double NODE_WIDTH = 120;
+        private const double NODE_HEIGHT = 60;
+        private const double NODE_SPACING_X = 200;
+        private const double NODE_SPACING_Y = 150;
+        private const double ARROW_SIZE = 10;
         
         public TreePage()
         {
@@ -35,480 +58,566 @@ namespace TreeMethod.Views
                 _tree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
 
             Focusable = true;
-            Loaded += (_, __) => Keyboard.Focus(this);
-            PreviewKeyDown += OnPreviewKeyDown;
-            InitializeViewer();
-            BuildAndDrawGraphMsagl();
-        }
-        
-        private void InitializeViewer()
-        {
-            _viewer = new GViewer
-            {
-                EdgeInsertButtonVisible = true,
-                NavigationVisible = true,
-                LayoutEditingEnabled = true,
-                BackColor = System.Drawing.Color.White,
-                InsertingEdge = false,
-                // Удалены несуществующие свойства
-                LayoutAlgorithmSettingsButtonVisible = true,
-                UndoRedoButtonsVisible = true,
-                PanButtonPressed = true
-            };
+            InitializeContextMenu();
             
-            // Создаем контекстное меню WinForms для самого GViewer
-            _contextMenuStrip = new System.Windows.Forms.ContextMenuStrip();
-
-            var addChildItem = new System.Windows.Forms.ToolStripMenuItem("Добавить потомка");
-            addChildItem.Click += (s, e) =>
+            Loaded += (_, __) => 
             {
-                var id = GetTargetNodeId();
-                if (id.HasValue) AddChildMsagl(id.Value);
-            };
-
-            var renameItem = new System.Windows.Forms.ToolStripMenuItem("Переименовать");
-            renameItem.Click += (s, e) =>
-            {
-                var id = GetTargetNodeId();
-                if (id.HasValue) RenameNodeMsagl(id.Value);
-            };
-
-            var changeTypeMenu = new System.Windows.Forms.ToolStripMenuItem("Изменить тип");
-            var typeAndItem = new System.Windows.Forms.ToolStripMenuItem("AND");
-            typeAndItem.Click += (s, e) =>
-            {
-                var id = GetTargetNodeId();
-                if (id.HasValue) ChangeNodeType(NodeType.And);
-            };
-            var typeOrItem = new System.Windows.Forms.ToolStripMenuItem("OR");
-            typeOrItem.Click += (s, e) =>
-            {
-                var id = GetTargetNodeId();
-                if (id.HasValue) ChangeNodeType(NodeType.Or);
-            };
-            var typeLeafItem = new System.Windows.Forms.ToolStripMenuItem("LEAF");
-            typeLeafItem.Click += (s, e) =>
-            {
-                var id = GetTargetNodeId();
-                if (id.HasValue) ChangeNodeType(NodeType.Leaf);
-            };
-            changeTypeMenu.DropDownItems.Add(typeAndItem);
-            changeTypeMenu.DropDownItems.Add(typeOrItem);
-            changeTypeMenu.DropDownItems.Add(typeLeafItem);
-
-            var deleteItem = new System.Windows.Forms.ToolStripMenuItem("Удалить");
-            deleteItem.Click += (s, e) =>
-            {
-                var id = GetTargetNodeId();
-                if (id.HasValue) DeleteNodeMsagl(id.Value);
-            };
-
-            _contextMenuStrip.Items.Add(addChildItem);
-            _contextMenuStrip.Items.Add(renameItem);
-            _contextMenuStrip.Items.Add(changeTypeMenu);
-            _contextMenuStrip.Items.Add(deleteItem);
-
-            // Назначаем контекстное меню непосредственно контролу GViewer
-            _viewer.ContextMenuStrip = _contextMenuStrip;
-            
-            // Подписываемся на события
-            _viewer.MouseClick += Viewer_MouseClick;
-            _viewer.ObjectUnderMouseCursorChanged += Viewer_ObjectUnderMouseCursorChanged;
-            _viewer.MouseDown += Viewer_MouseDown;
-            _viewer.MouseUp += Viewer_MouseUp;
-            // Событие EdgeInserted больше не поддерживается в текущей версии MSAGL
-            
-            // Перетаскивание узлов включено по умолчанию в текущей версии MSAGL
-            
-            WinFormsHost.Child = _viewer;
-        }
-        
-        private void Viewer_EdgeInserted(object sender, EventArgs e)
-        {
-            if (_viewer.InsertingEdge)
-            {
-                // В текущей версии MSAGL нет прямого доступа к узлам вставки ребра
-                // Используем первые два узла из графа, так как свойство Selected отсутствует
-                var selectedNodes = _viewer.Graph.Nodes.Take(2).ToList();
+                Keyboard.Focus(this);
                 
-                if (selectedNodes.Count >= 2)
+                // Подписываемся на события Canvas после загрузки
+                if (GraphCanvas != null)
                 {
-                    var sourceNode = selectedNodes[0];
-                    var targetNode = selectedNodes[1];
+                    GraphCanvas.MouseLeftButtonDown += Canvas_MouseLeftButtonDown;
+                    GraphCanvas.MouseLeftButtonUp += Canvas_MouseLeftButtonUp;
+                    GraphCanvas.MouseMove += Canvas_MouseMove;
+                    GraphCanvas.MouseRightButtonDown += Canvas_MouseRightButtonDown;
                     
-                    // Преобразуем ID узлов в числа
-                    if (int.TryParse(sourceNode.Id, out var sourceId) && 
-                        int.TryParse(targetNode.Id, out var targetId))
+                    if (_nodeContextMenu != null)
                     {
-                        // Находим узел-родитель в модели
-                        var parentNode = _tree.Nodes.FirstOrDefault(n => n.Id == sourceId);
-                        
-                        if (parentNode != null && !parentNode.Children.Contains(targetId))
+                        GraphCanvas.ContextMenu = _nodeContextMenu;
+                    }
+                }
+                
+                BuildGraph();
+            };
+            PreviewKeyDown += OnPreviewKeyDown;
+        }
+        
+        private void BuildGraph()
+        {
+            // Проверяем, что Canvas инициализирован
+            if (GraphCanvas == null) return;
+            
+            // Очищаем Canvas
+            GraphCanvas.Children.Clear();
+            _nodeBorders.Clear();
+            _nodeLabels.Clear();
+            _edges.Clear();
+            
+            // Если нет позиций узлов, вычисляем их автоматически (сверху вниз)
+            // Но НЕ пересчитываем позиции узлов, которые были перемещены вручную
+            var nodesWithoutPositions = _tree.Nodes.Where(n => !_nodePositions.ContainsKey(n.Id)).ToList();
+            if (_nodePositions.Count == 0 || nodesWithoutPositions.Any())
+            {
+                // Сохраняем позиции вручную перемещённых узлов
+                var savedManualPositions = new Dictionary<int, Point>();
+                foreach (var nodeId in _manuallyMovedNodes)
+                {
+                    if (_nodePositions.ContainsKey(nodeId))
+                    {
+                        savedManualPositions[nodeId] = _nodePositions[nodeId];
+                    }
+                }
+                
+                // Пересчитываем позиции
+                CalculateNodePositions();
+                
+                // Восстанавливаем позиции вручную перемещённых узлов
+                foreach (var kvp in savedManualPositions)
+                {
+                    _nodePositions[kvp.Key] = kvp.Value;
+                }
+            }
+            
+            // Рисуем рёбра
+            DrawEdges();
+            
+            // Рисуем узлы
+            DrawNodes();
+        }
+        
+        private void CalculateNodePositions()
+        {
+            _nodePositions.Clear();
+            
+            if (!_tree.Nodes.Any()) return;
+            
+            // Находим корень (узел без родителей)
+            var rootNode = _tree.Nodes.FirstOrDefault(n => 
+                !_tree.Nodes.Any(p => p.Children.Contains(n.Id)));
+            
+            if (rootNode == null)
+                rootNode = _tree.Nodes[0]; // Если не нашли, берём первый
+            
+            var startX = 1000.0; // Центр Canvas
+            var startY = 100.0;
+            
+            // Сначала вычисляем ширину каждого поддерева
+            var subtreeWidths = new Dictionary<int, double>();
+            CalculateSubtreeWidths(rootNode.Id, subtreeWidths);
+            
+            // Рекурсивно размещаем узлы с учётом ширины поддеревьев
+            CalculatePositionRecursive(rootNode.Id, startX, startY, 0, subtreeWidths);
+        }
+        
+        private double CalculateSubtreeWidths(int nodeId, Dictionary<int, double> widths)
+        {
+            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            if (node == null) return NODE_WIDTH;
+            
+            if (!node.Children.Any())
+            {
+                widths[nodeId] = NODE_WIDTH;
+                return NODE_WIDTH;
+            }
+            
+            double totalWidth = 0;
+            bool isFirst = true;
+            
+            foreach (var childId in node.Children)
+            {
+                var childWidth = CalculateSubtreeWidths(childId, widths);
+                if (!isFirst)
+                {
+                    totalWidth += NODE_SPACING_X; // Промежуток между детьми
+                }
+                totalWidth += childWidth;
+                isFirst = false;
+            }
+            
+            // Ширина поддерева = максимум из ширины узла и ширины всех детей
+            widths[nodeId] = Math.Max(NODE_WIDTH, totalWidth);
+            return widths[nodeId];
+        }
+        
+        private double CalculatePositionRecursive(int nodeId, double leftX, double y, int depth, Dictionary<int, double> subtreeWidths)
+        {
+            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            if (node == null) return leftX;
+            
+            // Если узел был перемещён вручную, не пересчитываем его позицию, но размещаем его потомков
+            if (_manuallyMovedNodes.Contains(nodeId) && _nodePositions.ContainsKey(nodeId))
+            {
+                // Используем текущую позицию узла
+                var currentPos = _nodePositions[nodeId];
+                
+                // Но всё равно размещаем детей относительно текущей позиции
+                if (node.Children.Any())
+                {
+                    double childX = currentPos.X; // Начинаем с позиции родителя
+                    
+                    // Размещаем всех детей, которые не были перемещены вручную
+                    foreach (var childId in node.Children)
+                    {
+                        if (!_manuallyMovedNodes.Contains(childId) || !_nodePositions.ContainsKey(childId))
                         {
-                            // Добавляем связь в модели
-                            parentNode.Children.Add(targetId);
-                            ProjectData.RaiseTreeChanged();
+                            var childWidth = subtreeWidths.ContainsKey(childId) ? subtreeWidths[childId] : NODE_WIDTH;
                             
-                            // Перерисовываем граф
-                            BuildAndDrawGraphMsagl();
+                            CalculatePositionRecursive(
+                                childId, 
+                                childX,
+                                currentPos.Y + NODE_SPACING_Y,
+                                depth + 1,
+                                subtreeWidths);
+                            
+                            // Если у ребёнка есть позиция, используем её для расчёта следующего X
+                            if (_nodePositions.ContainsKey(childId))
+                            {
+                                var childPos = _nodePositions[childId];
+                                childX = childPos.X + NODE_WIDTH + NODE_SPACING_X;
+                            }
+                        }
+                        else
+                        {
+                            // Если ребёнок перемещён вручную, просто пропускаем его в расчёте, но учитываем его позицию
+                            if (_nodePositions.ContainsKey(childId))
+                            {
+                                var childPos = _nodePositions[childId];
+                                childX = Math.Max(childX, childPos.X + NODE_WIDTH + NODE_SPACING_X);
+                            }
                         }
                     }
                 }
-            }
-        }
-
-
- 
-        private void BuildAndDrawGraphMsagl()
-        {
-            if (_viewer == null)
-            {
-                _viewer = new GViewer();
-                WinFormsHost.Child = _viewer;
-            }
-
-            var g = new Graph();
-            foreach (var n in _tree.Nodes)
-            {
-                var node = g.AddNode(n.Id.ToString());
-                node.LabelText = $"{n.Name} ({n.Type})";
-                node.Attr.FillColor = n.Type switch
-                {
-                    NodeType.And => Color.LightGreen,
-                    NodeType.Or  => Color.LightBlue,
-                    _            => Color.LightGray
-                };
-            }
-            foreach (var parent in _tree.Nodes)
-                foreach (var childId in parent.Children.Distinct())
-                    g.AddEdge(parent.Id.ToString(), childId.ToString());
-
-            g.Attr.LayerDirection = LayerDirection.TB;
-            _viewer.Graph = g;
-        }
-
-        private void RenameNodeMsagl(int vertexId)
-        {
-            var node = _tree.Nodes.First(n => n.Id == vertexId);
-            var dialog = new AddNodeDialog(node, node.Name, node.Type);
-            if (dialog.ShowDialog() == true)
-            {
-                node.Name = dialog.NewNodeData.Name;
-                BuildAndDrawGraphMsagl();
-                ProjectData.RaiseTreeChanged();
-            }
-        }
-
-        private void AddChildMsagl(int parentId)
-        {
-            var parentNode = _tree.Nodes.First(n => n.Id == parentId);
-            var dialog = new AddNodeDialog(parentNode);
-            if (dialog.ShowDialog() == true)
-            {
-                var data = dialog.NewNodeData;
-                int newId = _tree.Nodes.Any() ? _tree.Nodes.Max(n => n.Id) + 1 : 0;
-                var newNode = new Models.Node { Id = newId, Name = data.Name, Type = data.Type };
-                if (!parentNode.Children.Contains(newId)) parentNode.Children.Add(newId);
-                _tree.Nodes.Add(newNode);
-                BuildAndDrawGraphMsagl();
-                ProjectData.RaiseTreeChanged();
-            }
-        }
-
-        private void ChangeTypeMsagl(int vertexId)
-        {
-            var node = _tree.Nodes.First(n => n.Id == vertexId);
-            var dialog = new AddNodeDialog(node, node.Name, node.Type);
-            if (dialog.ShowDialog() == true)
-            {
-                node.Type = dialog.NewNodeData.Type;
-                BuildAndDrawGraphMsagl();
-                ProjectData.RaiseTreeChanged();
-            }
-        }
-
-        private void DeleteNodeMsagl(int vertexId)
-        {
-            if (vertexId == 0)
-            {
-                System.Windows.MessageBox.Show("Нельзя удалить корень!");
-                return;
+                
+                // Возвращаем правую границу поддерева на основе текущей позиции узла
+                return currentPos.X + NODE_WIDTH;
             }
             
-            // Получаем список всех узлов, которые нужно удалить (включая потомков)
-            var nodesToDelete = GetNodeWithDescendants(vertexId);
-            
-            // Удаляем ссылки на удаляемые узлы из списков Children всех узлов
-            foreach (var nodeId in nodesToDelete)
+            if (!node.Children.Any())
             {
-                foreach (var node in _tree.Nodes)
+                // Листовой узел - размещаем по левому краю
+                _nodePositions[nodeId] = new Point(leftX, y);
+                return leftX + NODE_WIDTH;
+            }
+            
+            // Размещаем детей с учётом ширины их поддеревьев
+            double currentX = leftX;
+            var childPositions = new List<double>();
+            
+            foreach (var childId in node.Children)
+            {
+                // Если ребёнок был перемещён вручную, используем его текущую позицию
+                if (_manuallyMovedNodes.Contains(childId) && _nodePositions.ContainsKey(childId))
                 {
-                    node.Children.RemoveAll(id => id == nodeId);
+                    var childPos = _nodePositions[childId];
+                    childPositions.Add(childPos.X + NODE_WIDTH / 2);
+                    currentX = Math.Max(currentX, childPos.X + NODE_WIDTH + NODE_SPACING_X);
                 }
-            }
-            
-            // Удаляем сами узлы
-            _tree.Nodes.RemoveAll(n => nodesToDelete.Contains(n.Id));
-            
-            BuildAndDrawGraphMsagl();
-            ProjectData.RaiseTreeChanged();
-        }
-        
-        // Метод для получения узла и всех его потомков рекурсивно
-        private HashSet<int> GetNodeWithDescendants(int nodeId)
-        {
-            var result = new HashSet<int> { nodeId };
-            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
-            
-            if (node != null)
-            {
-                foreach (var childId in node.Children)
-                {
-                    // Рекурсивно добавляем всех потомков
-                    foreach (var descendantId in GetNodeWithDescendants(childId))
-                    {
-                        result.Add(descendantId);
-                    }
-                }
-            }
-            
-            return result;
-        }
-
-        // удалены методы ручного Canvas CRUD и рендера
-
-        private void ClearTree_Click(object sender, RoutedEventArgs e)
-        {
-            if (System.Windows.MessageBox.Show("Удалить всё дерево?", "Подтверждение", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
-                return;
-
-            _tree.Nodes.Clear();
-
-            var root = new ModelNode
-            {
-                Id = 0,
-                Name = "Система",
-                Type = NodeType.And,
-                Children = new List<int>()
-            };
-
-            _tree.Nodes.Add(root);
-            BuildAndDrawGraphMsagl();
-            ProjectData.RaiseTreeChanged();
-
-            System.Windows.MessageBox.Show("Дерево очищено. Создан новый корень 'Система'.", "Готово", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-
-        // ---------------- СЕРИАЛИЗАЦИЯ ----------------
-        private void SaveTree_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string path = "project.json";
-                ProjectData.CurrentTree.SaveProject(path);
-                System.Windows.MessageBox.Show($"Проект сохранён в {path}", "Сохранено");
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show($"Ошибка при сохранении: {ex.Message}");
-            }
-        }
-
-        private void LoadTree_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                string path = "project.json";
-                if (!File.Exists(path))
-                {
-                    System.Windows.MessageBox.Show("Файл project.json не найден.");
-                    return;
-                }
-
-                var loaded = TreeModel.LoadProject(path);
-                if (loaded == null)
-                {
-                    System.Windows.MessageBox.Show("Ошибка загрузки: пустой объект.");
-                    return;
-                }
-
-                ProjectData.CurrentTree = loaded;
-                _tree.Nodes = loaded.Nodes;
-                _tree.EP = loaded.EP;
-                _tree.AP = loaded.AP;
-                _tree.GoalWeights = loaded.GoalWeights;
-
-                BuildAndDrawGraphMsagl();
-
-                ProjectData.RaiseTreeChanged();
-
-                System.Windows.MessageBox.Show("Проект успешно загружен.", "Готово");
-            }
-            catch (Exception ex)
-            {
-                System.Windows.MessageBox.Show($"Ошибка загрузки: {ex.Message}", "Ошибка");
-            }
-        }
-
-
-
-        private void RedrawTree_Click(object sender, RoutedEventArgs e) => BuildAndDrawGraphMsagl();
-
-        private void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            if (e.Key == Key.Delete)
-            {
-                if (_viewer?.SelectedObject is Microsoft.Msagl.Drawing.Node vnode)
-                {
-                    if (int.TryParse(vnode.Id, out var vid))
-                    {
-                        DeleteNodeMsagl(vid);
-                        e.Handled = true;
-                        return;
-                    }
-                }
-            }
-        }
-        
-        private void Viewer_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
-        {
-            // Обработка правого клика для показа контекстного меню
-            // Контекстное меню уже привязано к WinFormsHost, поэтому нам не нужно
-            // вручную его показывать - WPF сделает это автоматически
-            
-            // Сохраняем выбранный узел для использования в командах контекстного меню
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node)
-            {
-                // Обновляем состояние UI при необходимости
-            }
-        }
-        
-        private void Viewer_ObjectUnderMouseCursorChanged(object sender, ObjectUnderMouseCursorChangedEventArgs e)
-        {
-            if (e.NewObject is Microsoft.Msagl.Drawing.Node)
-            {
-                // Используем стандартный метод установки подсказки
-                System.Windows.Forms.ToolTip toolTip = new System.Windows.Forms.ToolTip();
-                toolTip.SetToolTip(_viewer, "Щелкните правой кнопкой мыши для вызова меню");
-                var vnode = (Microsoft.Msagl.Drawing.Node)e.NewObject;
-                if (int.TryParse(vnode.Id, out var id))
-                    _nodeUnderCursorId = id;
                 else
-                    _nodeUnderCursorId = null;
-            }
-            else
-            {
-                _nodeUnderCursorId = null;
-            }
-        }
-        
-        private void AddChildToSelectedNode()
-        {
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
-            {
-                AddChildMsagl(nodeId);
-            }
-        }
-        
-        private void RenameSelectedNode()
-        {
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
-            {
-                RenameNodeMsagl(nodeId);
-            }
-        }
-        
-        private void ChangeTypeOfSelectedNode()
-        {
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
-            {
-                ChangeTypeMsagl(nodeId);
-            }
-        }
-        
-        private void ChangeNodeType(NodeType newType)
-        {
-            var nodeIdOpt = GetTargetNodeId();
-            if (!nodeIdOpt.HasValue) return;
-            var nodeId = nodeIdOpt.Value;
-
-            var modelNode = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
-            if (modelNode != null)
-            {
-                if (newType == NodeType.Leaf && modelNode.Children.Any())
                 {
-                    System.Windows.MessageBox.Show("Нельзя установить тип Leaf: у узла есть потомки.", "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                modelNode.Type = newType;
-                BuildAndDrawGraphMsagl();
-                ProjectData.RaiseTreeChanged();
-            }
-        }
-        
-        private void DeleteSelectedNode()
-        {
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
-            {
-                DeleteNodeMsagl(nodeId);
-            }
-        }
-
-        private void Viewer_MouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
-        {
-            // Начало режима соединения: удерживайте Shift и нажмите на узел
-            if (e.Button == System.Windows.Forms.MouseButtons.Left && (System.Windows.Forms.Control.ModifierKeys & System.Windows.Forms.Keys.Shift) == System.Windows.Forms.Keys.Shift)
-            {
-                if (_nodeUnderCursorId.HasValue)
-                {
-                    _isConnecting = true;
-                    _connectSourceId = _nodeUnderCursorId.Value;
+                    var childWidth = subtreeWidths.ContainsKey(childId) ? subtreeWidths[childId] : NODE_WIDTH;
+                    
+                    // Центрируем ребёнка относительно его поддерева
+                    var childCenterX = currentX + childWidth / 2;
+                    
+                    var childRightX = CalculatePositionRecursive(
+                        childId, 
+                        currentX,
+                        y + NODE_SPACING_Y,
+                        depth + 1,
+                        subtreeWidths);
+                    
+                    childPositions.Add(childCenterX - NODE_WIDTH / 2);
+                    currentX = childRightX + NODE_SPACING_X;
                 }
             }
+            
+            // Центрируем текущий узел относительно всех детей
+            double nodeCenterX = childPositions.Any() 
+                ? (childPositions.First() + childPositions.Last() + NODE_WIDTH) / 2
+                : leftX + NODE_WIDTH / 2;
+            
+            _nodePositions[nodeId] = new Point(nodeCenterX - NODE_WIDTH / 2, y);
+            
+            return currentX - NODE_SPACING_X; // Возвращаем правую границу поддерева
         }
-
-        private int? GetTargetNodeId()
+        
+        private void DrawNodes()
         {
-            if (_nodeUnderCursorId.HasValue) return _nodeUnderCursorId.Value;
-            if (_viewer.SelectedObject is Microsoft.Msagl.Drawing.Node node && int.TryParse(node.Id, out var nodeId))
-                return nodeId;
-            return null;
+            foreach (var node in _tree.Nodes)
+            {
+                if (!_nodePositions.ContainsKey(node.Id)) continue;
+                
+                var pos = _nodePositions[node.Id];
+                
+                // Создаём Border для узла
+                var border = new Border
+                {
+                    Width = NODE_WIDTH,
+                    Height = NODE_HEIGHT,
+                    CornerRadius = new CornerRadius(5),
+                    BorderBrush = new SolidColorBrush(Colors.DarkGray),
+                    BorderThickness = new Thickness(2),
+                    Background = GetNodeColor(node.Type),
+                    Cursor = Cursors.Hand,
+                    Tag = node.Id
+                };
+                
+                // Создаём TextBlock для текста
+                var textBlock = new TextBlock
+                {
+                    Text = node.Name,
+                    FontSize = 12,
+                    FontFamily = new FontFamily("Arial"),
+                    Foreground = new SolidColorBrush(Colors.Black),
+                    TextAlignment = TextAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    TextWrapping = TextWrapping.Wrap,
+                    Padding = new Thickness(5),
+                    IsHitTestVisible = false // Позволяем событиям мыши проходить через TextBlock к Border
+                };
+                
+                border.Child = textBlock;
+                
+                // Размещаем на Canvas
+                Canvas.SetLeft(border, pos.X);
+                Canvas.SetTop(border, pos.Y);
+                
+                GraphCanvas.Children.Add(border);
+                
+                _nodeBorders[node.Id] = border;
+                _nodeLabels[node.Id] = textBlock;
+                
+                // Подписываемся на события
+                border.MouseEnter += (s, e) => border.BorderBrush = new SolidColorBrush(Colors.Blue);
+                border.MouseLeave += (s, e) => border.BorderBrush = new SolidColorBrush(Colors.DarkGray);
+            }
         }
-
-        private void Viewer_MouseUp(object sender, System.Windows.Forms.MouseEventArgs e)
+        
+        private void DrawEdges()
         {
+            foreach (var parent in _tree.Nodes)
+            {
+                foreach (var childId in parent.Children.Distinct())
+                {
+                    if (!_nodePositions.ContainsKey(parent.Id) || 
+                        !_nodePositions.ContainsKey(childId))
+                        continue;
+                    
+                    var parentPos = _nodePositions[parent.Id];
+                    var childPos = _nodePositions[childId];
+                    
+                    // Вычисляем точки соединения
+                    var parentCenterX = parentPos.X + NODE_WIDTH / 2;
+                    var parentBottom = parentPos.Y + NODE_HEIGHT;
+                    var childCenterX = childPos.X + NODE_WIDTH / 2;
+                    var childTop = childPos.Y;
+                    
+                    // Рисуем линию
+                    var line = new Line
+                    {
+                        X1 = parentCenterX,
+                        Y1 = parentBottom,
+                        X2 = childCenterX,
+                        Y2 = childTop,
+                        Stroke = new SolidColorBrush(Colors.DarkGray),
+                        StrokeThickness = 2
+                    };
+                    
+                    GraphCanvas.Children.Add(line);
+                    
+                    // Рисуем стрелку
+                    DrawArrow(parentCenterX, parentBottom, childCenterX, childTop);
+                    
+                    var edgeKey = $"{parent.Id}-{childId}";
+                    _edges[edgeKey] = null; // Сохраняем факт существования ребра
+                }
+            }
+        }
+        
+        private void DrawArrow(double x1, double y1, double x2, double y2)
+        {
+            var dx = x2 - x1;
+            var dy = y2 - y1;
+            var length = Math.Sqrt(dx * dx + dy * dy);
+            
+            if (length < 0.1) return;
+            
+            var unitX = dx / length;
+            var unitY = dy / length;
+            
+            // Точка на конце стрелки (немного не доходя до узла)
+            var arrowTipX = x2 - unitX * (NODE_HEIGHT / 2 + 5);
+            var arrowTipY = y2 - unitY * (NODE_HEIGHT / 2 + 5);
+            
+            // Вектор перпендикулярный линии
+            var perpX = -unitY;
+            var perpY = unitX;
+            
+            // Точки стрелки
+            var p1 = new Point(arrowTipX, arrowTipY);
+            var p2 = new Point(arrowTipX - unitX * ARROW_SIZE + perpX * ARROW_SIZE / 2, 
+                              arrowTipY - unitY * ARROW_SIZE + perpY * ARROW_SIZE / 2);
+            var p3 = new Point(arrowTipX - unitX * ARROW_SIZE - perpX * ARROW_SIZE / 2, 
+                              arrowTipY - unitY * ARROW_SIZE - perpY * ARROW_SIZE / 2);
+            
+            var arrow = new Polygon
+            {
+                Points = new PointCollection { p1, p2, p3 },
+                Fill = new SolidColorBrush(Colors.DarkGray),
+                Stroke = new SolidColorBrush(Colors.DarkGray)
+            };
+            
+            GraphCanvas.Children.Add(arrow);
+        }
+        
+        private Brush GetNodeColor(NodeType type)
+        {
+            return type switch
+            {
+                NodeType.And => new SolidColorBrush(Color.FromRgb(144, 238, 144)), // LightGreen
+                NodeType.Or => new SolidColorBrush(Color.FromRgb(173, 216, 230)),  // LightBlue
+                _ => new SolidColorBrush(Color.FromRgb(211, 211, 211))             // LightGray
+            };
+        }
+        
+        private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var element = e.OriginalSource as FrameworkElement;
+            if (element?.Tag is int nodeId)
+            {
+                var border = _nodeBorders[nodeId];
+                if (border != null)
+                {
+                    // Проверяем Shift для соединения узлов
+                    if (Keyboard.Modifiers == ModifierKeys.Shift)
+                    {
+                        _isConnecting = true;
+                        _connectSourceId = nodeId;
+                        border.BorderBrush = new SolidColorBrush(Colors.Green);
+                    }
+                    else
+                    {
+                        // Начинаем перетаскивание
+                        _isDragging = true;
+                        _draggedNodeId = nodeId;
+                        _dragStartPoint = e.GetPosition(GraphCanvas);
+                        _nodeStartPosition = _nodePositions[nodeId];
+                        // Отмечаем узел как перемещённый вручную
+                        _manuallyMovedNodes.Add(nodeId);
+                        border.CaptureMouse();
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+        
+        private void Canvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDragging && _draggedNodeId.HasValue)
+            {
+                var currentPos = e.GetPosition(GraphCanvas);
+                var deltaX = currentPos.X - _dragStartPoint.X;
+                var deltaY = currentPos.Y - _dragStartPoint.Y;
+                
+                var newPos = new Point(
+                    _nodeStartPosition.X + deltaX,
+                    _nodeStartPosition.Y + deltaY);
+                
+                _nodePositions[_draggedNodeId.Value] = newPos;
+                
+                var border = _nodeBorders[_draggedNodeId.Value];
+                if (border != null)
+                {
+                    Canvas.SetLeft(border, newPos.X);
+                    Canvas.SetTop(border, newPos.Y);
+                }
+                
+                // Перерисовываем рёбра
+                RebuildGraph();
+            }
+        }
+        
+        private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDragging && _draggedNodeId.HasValue)
+            {
+                var border = _nodeBorders[_draggedNodeId.Value];
+                if (border != null)
+                {
+                    border.ReleaseMouseCapture();
+                }
+                _isDragging = false;
+                _draggedNodeId = null;
+            }
+            
             if (_isConnecting)
             {
-                _isConnecting = false;
-                if (_connectSourceId.HasValue && _nodeUnderCursorId.HasValue)
+                var element = e.OriginalSource as FrameworkElement;
+                if (element?.Tag is int targetNodeId && _connectSourceId.HasValue)
                 {
-                    var src = _connectSourceId.Value;
-                    var dst = _nodeUnderCursorId.Value;
-                    _connectSourceId = null;
-                    if (src != dst)
+                    if (_connectSourceId.Value != targetNodeId)
                     {
-                        TryConnectNodes(src, dst);
+                        TryConnectNodes(_connectSourceId.Value, targetNodeId);
                     }
                 }
+                
+                // Сбрасываем подсветку
+                if (_connectSourceId.HasValue)
+                {
+                    var border = _nodeBorders[_connectSourceId.Value];
+                    if (border != null)
+                    {
+                        border.BorderBrush = new SolidColorBrush(Colors.DarkGray);
+                    }
+                }
+                
+                _isConnecting = false;
+                _connectSourceId = null;
             }
         }
-
+        
+        private void InitializeContextMenu()
+        {
+            _nodeContextMenu = new ContextMenu();
+            
+            var addChildItem = new MenuItem { Header = "Добавить потомка" };
+            addChildItem.Click += (s, e) => 
+            {
+                if (_selectedNodeId.HasValue) AddChild(_selectedNodeId.Value);
+            };
+            
+            var renameItem = new MenuItem { Header = "Переименовать" };
+            renameItem.Click += (s, e) => 
+            {
+                if (_selectedNodeId.HasValue) RenameNode(_selectedNodeId.Value);
+            };
+            
+            var changeTypeMenu = new MenuItem { Header = "Изменить тип" };
+            var typeAndItem = new MenuItem { Header = "AND" };
+            typeAndItem.Click += (s, e) => 
+            {
+                if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.And);
+            };
+            var typeOrItem = new MenuItem { Header = "OR" };
+            typeOrItem.Click += (s, e) => 
+            {
+                if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.Or);
+            };
+            var typeLeafItem = new MenuItem { Header = "LEAF" };
+            typeLeafItem.Click += (s, e) => 
+            {
+                if (_selectedNodeId.HasValue) ChangeNodeType(_selectedNodeId.Value, NodeType.Leaf);
+            };
+            changeTypeMenu.Items.Add(typeAndItem);
+            changeTypeMenu.Items.Add(typeOrItem);
+            changeTypeMenu.Items.Add(typeLeafItem);
+            
+            var deleteItem = new MenuItem { Header = "Удалить" };
+            deleteItem.Click += (s, e) => 
+            {
+                if (_selectedNodeId.HasValue) DeleteNode(_selectedNodeId.Value);
+            };
+            
+            _nodeContextMenu.Items.Add(addChildItem);
+            _nodeContextMenu.Items.Add(renameItem);
+            _nodeContextMenu.Items.Add(changeTypeMenu);
+            _nodeContextMenu.Items.Add(new Separator());
+            _nodeContextMenu.Items.Add(deleteItem);
+        }
+        
+        private void Canvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var element = e.OriginalSource as FrameworkElement;
+            if (element?.Tag is int nodeId)
+            {
+                _selectedNodeId = nodeId;
+                if (_nodeContextMenu != null)
+                {
+                    _nodeContextMenu.IsOpen = true;
+                }
+                e.Handled = true;
+            }
+        }
+        
+        private void RebuildGraph()
+        {
+            // Удаляем только рёбра, узлы оставляем
+            var lines = GraphCanvas.Children.OfType<Line>().ToList();
+            var polygons = GraphCanvas.Children.OfType<Polygon>().ToList();
+            
+            foreach (var edge in lines)
+            {
+                GraphCanvas.Children.Remove(edge);
+            }
+            
+            foreach (var arrow in polygons)
+            {
+                GraphCanvas.Children.Remove(arrow);
+            }
+            
+            _edges.Clear();
+            DrawEdges();
+        }
+        
         private void TryConnectNodes(int parentId, int childId)
         {
             // Валидация: один родитель на узел
             var hasOtherParent = _tree.Nodes.Any(n => n.Children.Contains(childId) && n.Id != parentId);
             if (hasOtherParent)
             {
-                System.Windows.MessageBox.Show("Узел уже имеет другого родителя. Строгое дерево: один родитель.", "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Узел уже имеет другого родителя. Строгое дерево: один родитель.", 
+                    "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-
-            // Валидация: отсутствие циклов (child не должен быть предком parent)
+            
+            // Валидация: отсутствие циклов
             var descendantsOfChild = GetNodeWithDescendants(childId);
             if (descendantsOfChild.Contains(parentId))
             {
-                System.Windows.MessageBox.Show("Создание цикла запрещено.", "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Создание цикла запрещено.", 
+                    "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -519,8 +628,224 @@ namespace TreeMethod.Views
             if (!parentNode.Children.Contains(childId))
                 parentNode.Children.Add(childId);
 
-            BuildAndDrawGraphMsagl();
+            BuildGraph();
             ProjectData.RaiseTreeChanged();
         }
+        
+        private HashSet<int> GetNodeWithDescendants(int nodeId)
+        {
+            var result = new HashSet<int> { nodeId };
+            var node = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            
+            if (node != null)
+            {
+                foreach (var childId in node.Children)
+                {
+                    foreach (var descendantId in GetNodeWithDescendants(childId))
+                    {
+                        result.Add(descendantId);
+                    }
+                }
+            }
+            
+            return result;
+        }
+
+        // Основные операции
+        private void AddChild(int parentId)
+        {
+            var parentNode = _tree.Nodes.First(n => n.Id == parentId);
+            var dialog = new AddNodeDialog(parentNode);
+            if (dialog.ShowDialog() == true)
+            {
+                var data = dialog.NewNodeData;
+                int newId = _tree.Nodes.Any() ? _tree.Nodes.Max(n => n.Id) + 1 : 0;
+                var newNode = new ModelNode { Id = newId, Name = data.Name, Type = data.Type };
+                if (!parentNode.Children.Contains(newId)) 
+                    parentNode.Children.Add(newId);
+                _tree.Nodes.Add(newNode);
+                
+                // Размещаем новый узел под родителем
+                // Если родитель был перемещён вручную, размещаем новый узел относительно его текущей позиции
+                var parentPos = _nodePositions.ContainsKey(parentId) 
+                    ? _nodePositions[parentId] 
+                    : new Point(1000, 100);
+                
+                var newY = parentPos.Y + NODE_SPACING_Y;
+                
+                // Находим свободное место под родителем (смотрим, есть ли уже другие потомки)
+                var siblings = parentNode.Children.Where(cid => cid != newId && _nodePositions.ContainsKey(cid)).ToList();
+                
+                double newX;
+                if (siblings.Any())
+                {
+                    // Если есть другие потомки, размещаем справа от самого правого
+                    var rightmostSibling = siblings
+                        .Select(sid => _nodePositions[sid].X)
+                        .Max();
+                    newX = rightmostSibling + NODE_SPACING_X;
+                }
+                else
+                {
+                    // Если это первый потомок, центрируем под родителем
+                    // Центр родителя: parentPos.X + NODE_WIDTH / 2
+                    // Центр нового узла должен быть там же, значит левый край: parentPos.X
+                    newX = parentPos.X;
+                }
+                
+                _nodePositions[newId] = new Point(newX, newY);
+                
+                BuildGraph();
+                ProjectData.RaiseTreeChanged();
+            }
+        }
+        
+        private void RenameNode(int nodeId)
+        {
+            var node = _tree.Nodes.First(n => n.Id == nodeId);
+            var dialog = new AddNodeDialog(node, node.Name, node.Type);
+            if (dialog.ShowDialog() == true)
+            {
+                node.Name = dialog.NewNodeData.Name;
+                if (_nodeLabels.ContainsKey(nodeId))
+                {
+                    _nodeLabels[nodeId].Text = node.Name;
+                }
+                ProjectData.RaiseTreeChanged();
+            }
+        }
+        
+        private void ChangeNodeType(int nodeId, NodeType newType)
+        {
+            var modelNode = _tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            if (modelNode != null)
+            {
+                if (newType == NodeType.Leaf && modelNode.Children.Any())
+                {
+                    MessageBox.Show("Нельзя установить тип Leaf: у узла есть потомки.", 
+                        "Запрещено", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                modelNode.Type = newType;
+                if (_nodeBorders.ContainsKey(nodeId))
+                {
+                    _nodeBorders[nodeId].Background = GetNodeColor(newType);
+                }
+                ProjectData.RaiseTreeChanged();
+            }
+        }
+        
+        private void DeleteNode(int nodeId)
+        {
+            if (nodeId == 0)
+            {
+                MessageBox.Show("Нельзя удалить корень!");
+                return;
+            }
+            
+            var nodesToDelete = GetNodeWithDescendants(nodeId);
+            
+            foreach (var id in nodesToDelete)
+            {
+                foreach (var node in _tree.Nodes)
+                {
+                    node.Children.RemoveAll(childId => childId == id);
+                }
+                _nodePositions.Remove(id);
+                _manuallyMovedNodes.Remove(id); // Убираем из списка вручную перемещённых
+            }
+            
+            _tree.Nodes.RemoveAll(n => nodesToDelete.Contains(n.Id));
+            
+            BuildGraph();
+            ProjectData.RaiseTreeChanged();
+        }
+        
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete && _selectedNodeId.HasValue)
+            {
+                DeleteNode(_selectedNodeId.Value);
+                e.Handled = true;
+            }
+        }
+        
+        // Методы для совместимости (если используются где-то)
+        private void ClearTree_Click(object sender, RoutedEventArgs e)
+        {
+            if (MessageBox.Show("Удалить всё дерево?", "Подтверждение", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                return;
+
+            _tree.Nodes.Clear();
+            _nodePositions.Clear();
+
+            var root = new ModelNode
+            {
+                Id = 0,
+                Name = "Система",
+                Type = NodeType.And,
+                Children = new List<int>()
+            };
+
+            _tree.Nodes.Add(root);
+            BuildGraph();
+            ProjectData.RaiseTreeChanged();
+
+            MessageBox.Show("Дерево очищено. Создан новый корень 'Система'.", 
+                "Готово", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void SaveTree_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string path = "project.json";
+                ProjectData.CurrentTree.SaveProject(path);
+                MessageBox.Show($"Проект сохранён в {path}", "Сохранено");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при сохранении: {ex.Message}");
+            }
+        }
+
+        private void LoadTree_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string path = "project.json";
+                if (!File.Exists(path))
+                {
+                    MessageBox.Show("Файл project.json не найден.");
+                    return;
+                }
+
+                var loaded = TreeModel.LoadProject(path);
+                if (loaded == null)
+                {
+                    MessageBox.Show("Ошибка загрузки: пустой объект.");
+                    return;
+                }
+
+                ProjectData.CurrentTree = loaded;
+                _tree.Nodes = loaded.Nodes;
+                _tree.EP = loaded.EP;
+                _tree.AP = loaded.AP;
+                _tree.GoalWeights = loaded.GoalWeights;
+
+                _nodePositions.Clear(); // Сбрасываем позиции при загрузке
+                BuildGraph();
+
+                ProjectData.RaiseTreeChanged();
+
+                MessageBox.Show("Проект успешно загружен.", "Готово");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки: {ex.Message}", "Ошибка");
+            }
+        }
+
+        private void RedrawTree_Click(object sender, RoutedEventArgs e) => BuildGraph();
     }
 }

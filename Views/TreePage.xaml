@@ -3,20 +3,20 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      xmlns:wfi="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
       mc:Ignorable="d"
       Title="TreePage">
 
-    <Grid Background="#FFF" Width="1920" Height="1000">
-        <DockPanel>
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="10">
-                <Button Content="💾 Сохранить дерево" Width="150" Margin="5" Click="SaveTree_Click"/>
-                <Button Content="📂 Загрузить дерево" Width="150" Margin="5" Click="LoadTree_Click"/>
-                <Button Content="🔄 Перерисовать" Width="130" Margin="5" Click="RedrawTree_Click"/>
-                <Button Content="🧹 Очистить всё" Width="130" Margin="5" Click="ClearTree_Click"/>
-            </StackPanel>
-
-            <wfi:WindowsFormsHost x:Name="WinFormsHost" />
-        </DockPanel>
+    <Grid Background="#FFF">
+        <ScrollViewer x:Name="ScrollViewer" 
+                      HorizontalScrollBarVisibility="Auto" 
+                      VerticalScrollBarVisibility="Auto"
+                      Background="White">
+            <Canvas x:Name="GraphCanvas" 
+                    Background="White"
+                    Width="2000" 
+                    Height="2000">
+                <!-- Узлы и рёбра будут добавлены программно -->
+            </Canvas>
+        </ScrollViewer>
     </Grid>
 </Page>
