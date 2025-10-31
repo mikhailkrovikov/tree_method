@@ -53,7 +53,6 @@ namespace TreeMethod
             ExitCommand = new RelayCommand(_ => Exit());
 
             RunCalculationCommand = new RelayCommand(_ => RunCalculation());
-            AboutCommand = new RelayCommand(_ => ShowAbout());
         }
 
         #region Свойства
@@ -106,7 +105,6 @@ namespace TreeMethod
         public ICommand ExitCommand { get; }
 
         public ICommand RunCalculationCommand { get; }
-        public ICommand AboutCommand { get; }
 
         #endregion
 
@@ -380,8 +378,6 @@ namespace TreeMethod
             }
         }
 
-
-        private void ShowAbout() => MessageBox.Show("И-ИЛИ Дерево\nВерсия 0.1", "О программе");
 
         #endregion
 

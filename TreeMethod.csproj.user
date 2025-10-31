@@ -2,16 +2,7 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup />
   <ItemGroup>
-    <Compile Update="Helpers\InputBox.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Update="Views\CalculationPage.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Update="Views\MatricesPage.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Update="Views\ResultsPage.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Views\TreePage.xaml.cs">
