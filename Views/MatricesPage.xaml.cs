@@ -31,6 +31,10 @@ namespace TreeMethod.Views
             EPGrid.ItemsSource = ViewModel.EPRows;
             APGrid.ItemsSource = ViewModel.APRows;
             
+            // Подписываемся на события начала редактирования для добавления валидации ввода
+            EPGrid.PreparingCellForEdit += DataGrid_PreparingCellForEdit;
+            APGrid.PreparingCellForEdit += DataGrid_PreparingCellForEdit;
+            
             // Обновляем при изменении Features
             ViewModel.PropertyChanged += (s, e) =>
             {
@@ -224,6 +228,9 @@ namespace TreeMethod.Views
                 textBoxFactory.SetValue(TextBox.FontSizeProperty, 14.0);
                 textBoxFactory.SetValue(TextBox.HorizontalAlignmentProperty, HorizontalAlignment.Center);
                 textBoxFactory.SetValue(TextBox.VerticalAlignmentProperty, VerticalAlignment.Center);
+                // Добавляем обработчик для валидации ввода
+                textBoxFactory.AddHandler(TextBox.PreviewTextInputEvent, new TextCompositionEventHandler(TextBox_PreviewTextInput));
+                textBoxFactory.AddHandler(TextBox.KeyDownEvent, new KeyEventHandler(TextBox_KeyDown));
                 editingTemplate.VisualTree = textBoxFactory;
                 column.CellEditingTemplate = editingTemplate;
                 
@@ -386,6 +393,131 @@ namespace TreeMethod.Views
         {
             ViewModel?.LoadMatrices();
             SetupDataGrids();
+        }
+
+        private void DataGrid_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
+        {
+            // Добавляем валидацию ввода для TextBox при редактировании ячейки
+            if (e.EditingElement is TextBox textBox)
+            {
+                // Очищаем предыдущие обработчики
+                textBox.PreviewTextInput -= TextBox_PreviewTextInput;
+                textBox.KeyDown -= TextBox_KeyDown;
+                textBox.PreviewKeyDown -= TextBox_PreviewKeyDown;
+                
+                // Добавляем новые обработчики
+                textBox.PreviewTextInput += TextBox_PreviewTextInput;
+                textBox.KeyDown += TextBox_KeyDown;
+                textBox.PreviewKeyDown += TextBox_PreviewKeyDown;
+            }
+        }
+
+        private void TextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+            
+            // Получаем текущий текст с учетом выделения
+            string currentText = textBox.Text ?? "";
+            int selectionStart = textBox.SelectionStart;
+            int selectionLength = textBox.SelectionLength;
+            
+            // Формируем новый текст после вставки
+            string newText = currentText.Substring(0, selectionStart) + 
+                           e.Text + 
+                           currentText.Substring(selectionStart + selectionLength);
+            
+            // Проверяем каждый вводимый символ
+            foreach (char c in e.Text)
+            {
+                // Разрешаем только минус, цифры 0 и 1
+                if (c != '-' && c != '0' && c != '1')
+                {
+                    e.Handled = true;
+                    return;
+                }
+            }
+            
+            // Проверяем, что итоговый текст может стать валидным значением
+            newText = newText.Trim();
+            
+            // Разрешаем пустую строку, "-", "0", "1", "-1"
+            if (newText.Length > 2)
+            {
+                e.Handled = true;
+                return;
+            }
+            
+            // Проверяем, что минус может быть только в начале
+            if (newText.Contains('-') && (newText.IndexOf('-') != 0 || newText.Length == 1))
+            {
+                // Если минус не в начале или это просто "-", разрешаем (промежуточное состояние)
+                if (newText != "-" && newText.Length > 1)
+                {
+                    e.Handled = true;
+                    return;
+                }
+            }
+            
+            // Проверяем, что после минуса может быть только 1
+            if (newText.StartsWith("-") && newText.Length == 2 && newText[1] != '1')
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        private void TextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Разрешаем Delete, Backspace, Tab, Enter, стрелки
+            if (e.Key == Key.Delete || e.Key == Key.Back || 
+                e.Key == Key.Tab || e.Key == Key.Enter || 
+                e.Key == Key.Left || e.Key == Key.Right || 
+                e.Key == Key.Up || e.Key == Key.Down ||
+                (Keyboard.Modifiers == ModifierKeys.Control && (e.Key == Key.A || e.Key == Key.C || e.Key == Key.V || e.Key == Key.X)))
+            {
+                return; // Разрешаем эти клавиши
+            }
+            
+            // Блокируем все остальные клавиши, кроме цифр и минуса
+            if (!((e.Key >= Key.D0 && e.Key <= Key.D1) || // Цифры 0 и 1
+                  (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad1) || // Цифры на NumPad
+                  e.Key == Key.Subtract || e.Key == Key.OemMinus)) // Минус
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void TextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+            
+            // Обработка вставки (Ctrl+V)
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
+            {
+                var clipboardText = Clipboard.GetText();
+                string newText = textBox.Text.Substring(0, textBox.SelectionStart) + 
+                               clipboardText + 
+                               textBox.Text.Substring(textBox.SelectionStart + textBox.SelectionLength);
+                
+                if (!IsValidMatrixValue(newText))
+                {
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private bool IsValidMatrixValue(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return true; // Пустая строка разрешена (будет заменена на 0)
+            
+            // Убираем пробелы для проверки
+            text = text.Trim();
+            
+            // Проверяем, что текст является одним из допустимых значений
+            return text == "-1" || text == "0" || text == "1" || text == "-" || text == "";
         }
 
         private void DataGrid_PreviewMouseWheel(object sender, MouseWheelEventArgs e)

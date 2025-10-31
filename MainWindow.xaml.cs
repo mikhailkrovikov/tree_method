@@ -251,9 +251,49 @@ namespace TreeMethod
                 if (tree.EP == null || tree.AP == null)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
-                        MessageBox.Show("Матрицы E×P и A×P не заданы или не сохранены.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning));
-                    IsBusy = false;
+                    {
+                        MessageBox.Show("Матрицы E×P и A×P не заданы или не сохранены.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        IsBusy = false;
+                        StatusText = "Ошибка: матрицы не заданы";
+                    });
                     return;
+                }
+
+                // Валидация размеров матриц
+                var epRows = tree.EP.GetLength(0);
+                var epCols = tree.EP.GetLength(1);
+                var apRows = tree.AP.GetLength(0);
+                var apCols = tree.AP.GetLength(1);
+                var nonRootNodes = tree.Nodes.Count(n => 
+                {
+                    var allChildren = tree.Nodes.SelectMany(node => node.Children).ToHashSet();
+                    return !allChildren.Contains(n.Id);
+                });
+
+                // Проверка соответствия размеров
+                if (epCols != apCols)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show($"Несоответствие размеров матриц:\n" +
+                                      $"Матрица E×P имеет {epCols} столбцов (признаков),\n" +
+                                      $"а матрица A×P имеет {apCols} столбцов (признаков).\n\n" +
+                                      "Количество признаков должно совпадать в обеих матрицах.",
+                                      "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        IsBusy = false;
+                        StatusText = "Ошибка: несоответствие размеров матриц";
+                    });
+                    return;
+                }
+
+                if (nonRootNodes > epRows)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show($"Внимание: Количество узлов в дереве ({nonRootNodes}) больше, чем строк в матрице E×P ({epRows}).\n" +
+                                      $"Некоторые узлы не будут учтены при расчете.",
+                                      "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    });
                 }
 
                 // Автоматически подгоняем веса целей, если не заданы
@@ -262,17 +302,63 @@ namespace TreeMethod
                     tree.GoalWeights = Enumerable.Repeat(1, tree.AP.GetLength(0)).ToArray();
                 }
 
-                // Выполняем расчёты
-                int theoreticalCount = Algorithm1.CalculateRT(tree);
-                var rationalSolutions = Algorithm2.FindSolutions(tree);
-
-                // Обновляем результаты в UI
-                Application.Current.Dispatcher.Invoke(() =>
+                // Предупреждение о больших расчетах
+                var leafCount = tree.Nodes.Count(n => n.Children.Count == 0);
+                if (leafCount > 15)
                 {
-                    IsBusy = false;
-                    UpdateCalculationResults(theoreticalCount, rationalSolutions);
-                    StatusText = "Расчёт завершён";
-                });
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        var result = MessageBox.Show($"Дерево содержит {leafCount} листьев.\n" +
+                                                    $"Расчет может занять продолжительное время.\n\n" +
+                                                    $"Продолжить?",
+                                                    "Предупреждение", 
+                                                    MessageBoxButton.YesNo, 
+                                                    MessageBoxImage.Question);
+                        if (result == MessageBoxResult.No)
+                        {
+                            IsBusy = false;
+                            StatusText = "Расчёт отменён пользователем";
+                            return;
+                        }
+                    });
+                }
+
+                // Выполняем расчёты с обработкой ошибок
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        StatusText = "Выполняется расчёт (шаг 1/2: вычисление теоретического множества)...";
+                    });
+
+                    int theoreticalCount = Algorithm1.CalculateRT(tree);
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        StatusText = "Выполняется расчёт (шаг 2/2: поиск рациональных решений)...";
+                    });
+
+                    var rationalSolutions = Algorithm2.FindSolutions(tree);
+
+                    // Обновляем результаты в UI
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        IsBusy = false;
+                        UpdateCalculationResults(theoreticalCount, rationalSolutions);
+                        StatusText = $"Расчёт завершён. Найдено решений: {rationalSolutions.Count}";
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        IsBusy = false;
+                        MessageBox.Show($"Ошибка при выполнении расчёта:\n{ex.Message}\n\n" +
+                                      $"Тип ошибки: {ex.GetType().Name}",
+                                      "Ошибка расчёта", MessageBoxButton.OK, MessageBoxImage.Error);
+                        StatusText = "Ошибка при выполнении расчёта";
+                    });
+                }
             });
         }
         
