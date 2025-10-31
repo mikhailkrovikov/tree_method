@@ -57,3 +57,7 @@ dkms.conf
 /.vscode
 /bin/Debug/net9.0-windows
 /obj
+
+# WPF temporary files
+*_wpftmp.csproj
+*.wpftmp.csproj
