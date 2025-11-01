@@ -96,7 +96,13 @@
                                         Command="{Binding RunCalculationCommand}"
                                         Style="{StaticResource ModernButton}"
                                         Height="42"
-                                        HorizontalAlignment="Stretch" />
+                                        HorizontalAlignment="Stretch">
+                                    <Button.ToolTip>
+                                        <ToolTip Visibility="{Binding HasCalculationDisabledReason, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding CalculationDisabledReason}" TextWrapping="Wrap" MaxWidth="300"/>
+                                        </ToolTip>
+                                    </Button.ToolTip>
+                                </Button>
                             </StackPanel>
                         </Border>
 
