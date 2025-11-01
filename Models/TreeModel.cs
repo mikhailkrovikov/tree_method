@@ -8,15 +8,11 @@ namespace TreeMethod.Models
     public class TreeModel
     {
         public List<Node> Nodes { get; set; } = new();
-        public int[,] EP { get; set; }     // Матрица элементов × признаки
-        public int[,] AP { get; set; }     // Матрица целей × признаки
+        public int[,] EP { get; set; }
+        public int[,] AP { get; set; }
         public int[] GoalWeights { get; set; }
-        public List<string> FeatureNames { get; set; } = new(); // Названия признаков (P1, P2, ...)
-        public List<string> GoalNames { get; set; } = new(); // Названия целей (A1, A2, ...)
-
-        // ===============================
-        //  Сохранение / Загрузка проекта
-        // ===============================
+        public List<string> FeatureNames { get; set; } = new();
+        public List<string> GoalNames { get; set; } = new();
 
         public void SaveProject(string path)
         {
@@ -33,12 +29,11 @@ namespace TreeMethod.Models
         }
     }
 
-    // Класс для сериализации Node с правильным форматом Type
     public class SerializableNode
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public int Type { get; set; } // JSON формат: 0=And, 1=Or, 2=Leaf
+        public int Type { get; set; }
         public List<int> Children { get; set; } = new();
         
         public SerializableNode() { }
@@ -63,15 +58,14 @@ namespace TreeMethod.Models
         }
     }
 
-    // вспомогательный класс для сериализации
     public class SerializableTreeModel
     {
         public List<SerializableNode> Nodes { get; set; }
         public List<List<int>> EP { get; set; }
         public List<List<int>> AP { get; set; }
         public List<int> GoalWeights { get; set; }
-        public List<string> FeatureNames { get; set; } // Названия признаков
-        public List<string> GoalNames { get; set; } // Названия целей
+        public List<string> FeatureNames { get; set; }
+        public List<string> GoalNames { get; set; }
 
         public SerializableTreeModel() { }
 
@@ -112,9 +106,8 @@ namespace TreeMethod.Models
             if (EP != null && EP.Count > 0)
             {
                 int rows = EP.Count;
-                // Определяем максимальное количество столбцов среди всех строк
                 int cols = EP.Max(row => row?.Count ?? 0);
-                if (cols == 0) cols = 1; // Минимум один столбец
+                if (cols == 0) cols = 1;
                 
                 model.EP = new int[rows, cols];
                 for (int i = 0; i < rows; i++)
@@ -122,7 +115,6 @@ namespace TreeMethod.Models
                     int rowCols = EP[i]?.Count ?? 0;
                     for (int j = 0; j < cols; j++)
                     {
-                        // Если строка короче, заполняем нулями
                         model.EP[i, j] = (j < rowCols) ? EP[i][j] : 0;
                     }
                 }
@@ -131,9 +123,8 @@ namespace TreeMethod.Models
             if (AP != null && AP.Count > 0)
             {
                 int rows = AP.Count;
-                // Определяем максимальное количество столбцов среди всех строк
                 int cols = AP.Max(row => row?.Count ?? 0);
-                if (cols == 0) cols = 1; // Минимум один столбец
+                if (cols == 0) cols = 1;
                 
                 model.AP = new int[rows, cols];
                 for (int i = 0; i < rows; i++)
@@ -141,7 +132,6 @@ namespace TreeMethod.Models
                     int rowCols = AP[i]?.Count ?? 0;
                     for (int j = 0; j < cols; j++)
                     {
-                        // Если строка короче, заполняем нулями
                         model.AP[i, j] = (j < rowCols) ? AP[i][j] : 0;
                     }
                 }

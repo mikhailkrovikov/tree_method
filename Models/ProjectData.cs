@@ -6,7 +6,6 @@ namespace TreeMethod.Models
     {
         public static TreeModel CurrentTree { get; set; } = new TreeModel();
 
-        // Событие, которое оповещает о любых изменениях дерева
         public static event Action TreeChanged;
 
         public static void RaiseTreeChanged()
@@ -14,7 +13,6 @@ namespace TreeMethod.Models
             TreeChanged?.Invoke();
         }
 
-        // Обновление матриц после редактирования
         public static void UpdateMatrices(int[,] ep, int[,] ap)
         {
             CurrentTree.EP = ep;

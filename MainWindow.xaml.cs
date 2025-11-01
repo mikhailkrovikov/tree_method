@@ -41,11 +41,9 @@ namespace TreeMethod
 
         public MainViewModel()
         {
-            // Инициализация страниц
             TreePage = new TreePage();
             MatricesPage = new MatricesPage();
 
-            // Команды
             NewProjectCommand = new RelayCommand(_ => NewProject());
             OpenCommand = new RelayCommand(_ => Open());
             SaveCommand = new RelayCommand(_ => Save());
@@ -134,7 +132,6 @@ namespace TreeMethod
                 _currentFilePath = null;
                 ProjectData.RaiseTreeChanged();
                 
-                // Обновляем интерфейс
                 (TreePage as TreePage)?.RefreshGraph();
                 (MatricesPage as MatricesPage)?.RefreshMatrices();
                 
@@ -165,7 +162,6 @@ namespace TreeMethod
                     ProjectData.CurrentTree = loaded;
                     _currentFilePath = dialog.FileName;
                     
-                    // Обновляем интерфейс
                     (TreePage as TreePage)?.RefreshGraph();
                     (MatricesPage as MatricesPage)?.RefreshMatrices();
                     
@@ -183,7 +179,6 @@ namespace TreeMethod
         
         private void Save()
         {
-            // Всегда показываем диалог сохранения
             SaveAs();
         }
         
@@ -200,14 +195,12 @@ namespace TreeMethod
             {
                 try
                 {
-                    // Сохраняем матрицы и FeatureNames перед сохранением проекта
                     var matricesPage = MatricesPage;
                     if (matricesPage != null)
                     {
                         var matricesViewModel = matricesPage.DataContext as MatricesPageViewModel;
                         if (matricesViewModel != null)
                         {
-                            // Сохраняем матрицы и FeatureNames
                             matricesViewModel.SaveAllMatricesData();
                         }
                     }
@@ -229,7 +222,6 @@ namespace TreeMethod
 
         private void RunCalculation()
         {
-            // Сохраняем текущие изменения матриц перед расчетом
             var matricesPage = MatricesPage as MatricesPage;
             if (matricesPage != null)
             {
@@ -247,7 +239,6 @@ namespace TreeMethod
             {
                 var tree = ProjectData.CurrentTree;
 
-                // Проверка наличия дерева
                 if (tree == null || tree.Nodes.Count == 0)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -256,7 +247,6 @@ namespace TreeMethod
                     return;
                 }
 
-                // Проверка наличия матриц
                 if (tree.EP == null || tree.AP == null)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -268,7 +258,6 @@ namespace TreeMethod
                     return;
                 }
 
-                // Валидация размеров матриц
                 var epRows = tree.EP.GetLength(0);
                 var epCols = tree.EP.GetLength(1);
                 var apRows = tree.AP.GetLength(0);
@@ -279,7 +268,6 @@ namespace TreeMethod
                     return !allChildren.Contains(n.Id);
                 });
 
-                // Проверка соответствия размеров
                 if (epCols != apCols)
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -305,13 +293,11 @@ namespace TreeMethod
                     });
                 }
 
-                // Автоматически подгоняем веса целей, если не заданы
                 if (tree.GoalWeights == null || tree.GoalWeights.Length != tree.AP.GetLength(0))
                 {
                     tree.GoalWeights = Enumerable.Repeat(1, tree.AP.GetLength(0)).ToArray();
                 }
 
-                // Предупреждение о больших расчетах
                 var leafCount = tree.Nodes.Count(n => n.Children.Count == 0);
                 if (leafCount > 15)
                 {
@@ -332,7 +318,6 @@ namespace TreeMethod
                     });
                 }
 
-                // Выполняем расчёты с обработкой ошибок
                 try
                 {
                     Application.Current.Dispatcher.Invoke(() =>
@@ -349,7 +334,6 @@ namespace TreeMethod
 
                     var rationalSolutions = Algorithm2.FindSolutions(tree);
 
-                    // Обновляем результаты в UI
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         IsBusy = false;

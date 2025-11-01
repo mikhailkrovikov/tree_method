@@ -33,15 +33,14 @@ namespace TreeMethod.Views
             panel.Children.Add(new TextBlock { Text = "Тип узла:" });
             var typeBox = new ComboBox { Margin = new Thickness(0, 0, 0, 15), Height = 28 };
             
-            // Создаем словарь для отображения русских названий типов
-            var typeItems = new List<KeyValuePair<NodeType, string>>
+            var nodeTypeItems = new List<KeyValuePair<NodeType, string>>
             {
                 new KeyValuePair<NodeType, string>(NodeType.And, "И"),
                 new KeyValuePair<NodeType, string>(NodeType.Or, "ИЛИ"),
                 new KeyValuePair<NodeType, string>(NodeType.Leaf, "Висячий")
             };
             
-            typeBox.ItemsSource = typeItems;
+            typeBox.ItemsSource = nodeTypeItems;
             typeBox.DisplayMemberPath = "Value";
             typeBox.SelectedValuePath = "Key";
             typeBox.SelectedValue = existingType;

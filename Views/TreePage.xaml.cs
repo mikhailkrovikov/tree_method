@@ -14,37 +14,24 @@ namespace TreeMethod.Views
 {
     public partial class TreePage : Page
     {
-        // Используем свойство для доступа к актуальному дереву
         private TreeModel CurrentTree => ProjectData.CurrentTree;
  
-        // Словари для хранения UI элементов
-        private Dictionary<int, Border> _nodeBorders = new(); // Border - контейнер узла
-        private Dictionary<int, TextBlock> _nodeLabels = new(); // TextBlock - текст узла
-        private Dictionary<string, Polyline> _edges = new(); // Рёбра между узлами
-        
-        // Позиции узлов на Canvas
+        private Dictionary<int, Border> _nodeBorders = new();
+        private Dictionary<int, TextBlock> _nodeLabels = new();
+        private Dictionary<string, Polyline> _edges = new();
         private Dictionary<int, Point> _nodePositions = new();
-        
-        // Узлы, которые были перемещены вручную (не должны пересчитываться автоматически)
         private HashSet<int> _manuallyMovedNodes = new();
         
-        // Состояние для перетаскивания
         private bool _isDragging = false;
         private int? _draggedNodeId = null;
         private Point _dragStartPoint;
         private Point _nodeStartPosition;
-        
-        // Состояние для соединения узлов
         private bool _isConnecting = false;
         private int? _connectSourceId = null;
-        
-        // Текущий выбранный узел для контекстного меню
         private int? _selectedNodeId = null;
-        
-        // Контекстное меню для узлов
+        private bool _nodeWasMoved = false;
         private ContextMenu _nodeContextMenu;
         
-        // Константы для отрисовки
         private const double NODE_WIDTH = 120;
         private const double NODE_HEIGHT = 60;
         private const double NODE_SPACING_X = 200;
@@ -65,7 +52,6 @@ namespace TreeMethod.Views
             {
                 Keyboard.Focus(this);
                 
-                // Подписываемся на события Canvas после загрузки
                 if (GraphCanvas != null)
                 {
                     GraphCanvas.MouseLeftButtonDown += Canvas_MouseLeftButtonDown;
@@ -86,21 +72,16 @@ namespace TreeMethod.Views
         
         private void BuildGraph()
         {
-            // Проверяем, что Canvas инициализирован
             if (GraphCanvas == null) return;
             
-            // Очищаем Canvas
             GraphCanvas.Children.Clear();
             _nodeBorders.Clear();
             _nodeLabels.Clear();
             _edges.Clear();
             
-            // Если нет позиций узлов, вычисляем их автоматически (сверху вниз)
-            // Но НЕ пересчитываем позиции узлов, которые были перемещены вручную
             var nodesWithoutPositions = CurrentTree.Nodes.Where(n => !_nodePositions.ContainsKey(n.Id)).ToList();
             if (_nodePositions.Count == 0 || nodesWithoutPositions.Any())
             {
-                // Сохраняем позиции вручную перемещённых узлов
                 var savedManualPositions = new Dictionary<int, Point>();
                 foreach (var nodeId in _manuallyMovedNodes)
                 {
@@ -110,23 +91,16 @@ namespace TreeMethod.Views
                     }
                 }
                 
-                // Пересчитываем позиции
                 CalculateNodePositions();
                 
-                // Восстанавливаем позиции вручную перемещённых узлов
                 foreach (var kvp in savedManualPositions)
                 {
                     _nodePositions[kvp.Key] = kvp.Value;
                 }
             }
             
-            // Рисуем рёбра
             DrawEdges();
-            
-            // Рисуем узлы
             DrawNodes();
-            
-            // Обновляем размер Canvas в зависимости от размера графа
             UpdateCanvasSize();
         }
         
@@ -134,33 +108,27 @@ namespace TreeMethod.Views
         {
             if (!_nodePositions.Any())
             {
-                // Минимальный размер, если нет узлов
                 GraphCanvas.Width = 2000;
                 GraphCanvas.Height = 1000;
                 return;
             }
             
-            // Находим границы всех узлов
             double minX = _nodePositions.Values.Min(p => p.X);
             double minY = _nodePositions.Values.Min(p => p.Y);
             double maxX = _nodePositions.Values.Max(p => p.X) + NODE_WIDTH;
             double maxY = _nodePositions.Values.Max(p => p.Y) + NODE_HEIGHT;
             
-            // Добавляем отступы по краям (больше сверху для комфортной работы)
             const double padding = 100;
-            const double topPadding = 270; // Больший отступ сверху (~3 см дополнительно)
+            const double topPadding = 270;
             
-            // Canvas должен быть достаточно большим, чтобы вместить все узлы
             double requiredWidth = maxX + padding;
             double requiredHeight = maxY + topPadding;
             
-            // Если есть узлы с отрицательными координатами, добавляем место слева/сверху
             if (minX < 0)
                 requiredWidth += Math.Abs(minX) + padding;
             if (minY < 0)
                 requiredHeight += Math.Abs(minY) + padding;
             
-            // Минимальный размер (увеличена высота для большего пространства)
             const double minWidth = 800;
             const double minHeight = 1000;
             
@@ -174,21 +142,17 @@ namespace TreeMethod.Views
             
             if (!CurrentTree.Nodes.Any()) return;
             
-            // Находим корень (узел без родителей)
             var rootNode = CurrentTree.Nodes.FirstOrDefault(n => 
                 !CurrentTree.Nodes.Any(p => p.Children.Contains(n.Id)));
             
             if (rootNode == null)
-                rootNode = CurrentTree.Nodes[0]; // Если не нашли, берём первый
+                rootNode = CurrentTree.Nodes[0];
             
-            var startX = 1000.0; // Центр Canvas
-            var startY = 310.0; // Увеличено еще на ~3 см для большего пространства сверху
+            var startX = 1000.0;
+            var startY = 310.0;
             
-            // Сначала вычисляем ширину каждого поддерева
             var subtreeWidths = new Dictionary<int, double>();
             CalculateSubtreeWidths(rootNode.Id, subtreeWidths);
-            
-            // Рекурсивно размещаем узлы с учётом ширины поддеревьев
             CalculatePositionRecursive(rootNode.Id, startX, startY, 0, subtreeWidths);
         }
         
@@ -211,13 +175,12 @@ namespace TreeMethod.Views
                 var childWidth = CalculateSubtreeWidths(childId, widths);
                 if (!isFirst)
                 {
-                    totalWidth += NODE_SPACING_X; // Промежуток между детьми
+                    totalWidth += NODE_SPACING_X;
                 }
                 totalWidth += childWidth;
                 isFirst = false;
             }
             
-            // Ширина поддерева = максимум из ширины узла и ширины всех детей
             widths[nodeId] = Math.Max(NODE_WIDTH, totalWidth);
             return widths[nodeId];
         }
@@ -227,18 +190,14 @@ namespace TreeMethod.Views
             var node = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (node == null) return leftX;
             
-            // Если узел был перемещён вручную, не пересчитываем его позицию, но размещаем его потомков
             if (_manuallyMovedNodes.Contains(nodeId) && _nodePositions.ContainsKey(nodeId))
             {
-                // Используем текущую позицию узла
                 var currentPos = _nodePositions[nodeId];
                 
-                // Но всё равно размещаем детей относительно текущей позиции
                 if (node.Children.Any())
                 {
-                    double childX = currentPos.X; // Начинаем с позиции родителя
+                    double childX = currentPos.X;
                     
-                    // Размещаем всех детей, которые не были перемещены вручную
                     foreach (var childId in node.Children)
                     {
                         if (!_manuallyMovedNodes.Contains(childId) || !_nodePositions.ContainsKey(childId))
@@ -252,7 +211,6 @@ namespace TreeMethod.Views
                                 depth + 1,
                                 subtreeWidths);
                             
-                            // Если у ребёнка есть позиция, используем её для расчёта следующего X
                             if (_nodePositions.ContainsKey(childId))
                             {
                                 var childPos = _nodePositions[childId];
@@ -261,7 +219,6 @@ namespace TreeMethod.Views
                         }
                         else
                         {
-                            // Если ребёнок перемещён вручную, просто пропускаем его в расчёте, но учитываем его позицию
                             if (_nodePositions.ContainsKey(childId))
                             {
                                 var childPos = _nodePositions[childId];
@@ -271,24 +228,20 @@ namespace TreeMethod.Views
                     }
                 }
                 
-                // Возвращаем правую границу поддерева на основе текущей позиции узла
                 return currentPos.X + NODE_WIDTH;
             }
             
             if (!node.Children.Any())
             {
-                // Листовой узел - размещаем по левому краю
                 _nodePositions[nodeId] = new Point(leftX, y);
                 return leftX + NODE_WIDTH;
             }
             
-            // Размещаем детей с учётом ширины их поддеревьев
             double currentX = leftX;
             var childPositions = new List<double>();
             
             foreach (var childId in node.Children)
             {
-                // Если ребёнок был перемещён вручную, используем его текущую позицию
                 if (_manuallyMovedNodes.Contains(childId) && _nodePositions.ContainsKey(childId))
                 {
                     var childPos = _nodePositions[childId];
@@ -298,8 +251,6 @@ namespace TreeMethod.Views
                 else
                 {
                     var childWidth = subtreeWidths.ContainsKey(childId) ? subtreeWidths[childId] : NODE_WIDTH;
-                    
-                    // Центрируем ребёнка относительно его поддерева
                     var childCenterX = currentX + childWidth / 2;
                     
                     var childRightX = CalculatePositionRecursive(
@@ -314,14 +265,13 @@ namespace TreeMethod.Views
                 }
             }
             
-            // Центрируем текущий узел относительно всех детей
             double nodeCenterX = childPositions.Any() 
                 ? (childPositions.First() + childPositions.Last() + NODE_WIDTH) / 2
                 : leftX + NODE_WIDTH / 2;
             
             _nodePositions[nodeId] = new Point(nodeCenterX - NODE_WIDTH / 2, y);
             
-            return currentX - NODE_SPACING_X; // Возвращаем правую границу поддерева
+            return currentX - NODE_SPACING_X;
         }
         
         private void DrawNodes()
@@ -332,7 +282,6 @@ namespace TreeMethod.Views
                 
                 var pos = _nodePositions[node.Id];
                 
-                // Создаём Border для узла
                 var border = new Border
                 {
                     Width = NODE_WIDTH,
@@ -345,7 +294,6 @@ namespace TreeMethod.Views
                     Tag = node.Id
                 };
                 
-                // Создаём TextBlock для текста
                 var textBlock = new TextBlock
                 {
                     Text = node.Name,
@@ -357,12 +305,11 @@ namespace TreeMethod.Views
                     HorizontalAlignment = HorizontalAlignment.Center,
                     TextWrapping = TextWrapping.Wrap,
                     Padding = new Thickness(5),
-                    IsHitTestVisible = false // Позволяем событиям мыши проходить через TextBlock к Border
+                    IsHitTestVisible = false
                 };
                 
                 border.Child = textBlock;
                 
-                // Размещаем на Canvas
                 Canvas.SetLeft(border, pos.X);
                 Canvas.SetTop(border, pos.Y);
                 
@@ -371,9 +318,24 @@ namespace TreeMethod.Views
                 _nodeBorders[node.Id] = border;
                 _nodeLabels[node.Id] = textBlock;
                 
-                // Подписываемся на события
-                border.MouseEnter += (s, e) => border.BorderBrush = new SolidColorBrush(Colors.Blue);
-                border.MouseLeave += (s, e) => border.BorderBrush = new SolidColorBrush(Colors.DarkGray);
+                if (_selectedNodeId == node.Id)
+                {
+                    border.BorderBrush = new SolidColorBrush(Colors.Orange);
+                    border.BorderThickness = new Thickness(3);
+                }
+                
+                border.MouseEnter += (s, e) => 
+                {
+                    if (_selectedNodeId != node.Id)
+                        border.BorderBrush = new SolidColorBrush(Colors.Blue);
+                };
+                border.MouseLeave += (s, e) => 
+                {
+                    if (_selectedNodeId != node.Id)
+                        border.BorderBrush = new SolidColorBrush(Colors.DarkGray);
+                    else
+                        border.BorderBrush = new SolidColorBrush(Colors.Orange);
+                };
             }
         }
         
@@ -390,13 +352,11 @@ namespace TreeMethod.Views
                     var parentPos = _nodePositions[parent.Id];
                     var childPos = _nodePositions[childId];
                     
-                    // Вычисляем точки соединения
                     var parentCenterX = parentPos.X + NODE_WIDTH / 2;
                     var parentBottom = parentPos.Y + NODE_HEIGHT;
                     var childCenterX = childPos.X + NODE_WIDTH / 2;
                     var childTop = childPos.Y;
                     
-                    // Рисуем линию
                     var line = new Line
                     {
                         X1 = parentCenterX,
@@ -409,11 +369,10 @@ namespace TreeMethod.Views
                     
                     GraphCanvas.Children.Add(line);
                     
-                    // Рисуем стрелку
                     DrawArrow(parentCenterX, parentBottom, childCenterX, childTop);
                     
                     var edgeKey = $"{parent.Id}-{childId}";
-                    _edges[edgeKey] = null; // Сохраняем факт существования ребра
+                    _edges[edgeKey] = null;
                 }
             }
         }
@@ -429,15 +388,12 @@ namespace TreeMethod.Views
             var unitX = dx / length;
             var unitY = dy / length;
             
-            // Точка на конце стрелки (немного не доходя до узла)
             var arrowTipX = x2 - unitX * (NODE_HEIGHT / 2 + 5);
             var arrowTipY = y2 - unitY * (NODE_HEIGHT / 2 + 5);
             
-            // Вектор перпендикулярный линии
             var perpX = -unitY;
             var perpY = unitX;
             
-            // Точки стрелки
             var p1 = new Point(arrowTipX, arrowTipY);
             var p2 = new Point(arrowTipX - unitX * ARROW_SIZE + perpX * ARROW_SIZE / 2, 
                               arrowTipY - unitY * ARROW_SIZE + perpY * ARROW_SIZE / 2);
@@ -458,9 +414,9 @@ namespace TreeMethod.Views
         {
             return type switch
             {
-                NodeType.And => new SolidColorBrush(Color.FromRgb(144, 238, 144)), // LightGreen
-                NodeType.Or => new SolidColorBrush(Color.FromRgb(173, 216, 230)),  // LightBlue
-                _ => new SolidColorBrush(Color.FromRgb(211, 211, 211))             // LightGray
+                NodeType.And => new SolidColorBrush(Color.FromRgb(144, 238, 144)),
+                NodeType.Or => new SolidColorBrush(Color.FromRgb(173, 216, 230)),
+                _ => new SolidColorBrush(Color.FromRgb(211, 211, 211))
             };
         }
         
@@ -472,25 +428,33 @@ namespace TreeMethod.Views
                 var border = _nodeBorders[nodeId];
                 if (border != null)
                 {
-                    // Проверяем Shift для соединения узлов
                     if (Keyboard.Modifiers == ModifierKeys.Shift)
                     {
                         _isConnecting = true;
                         _connectSourceId = nodeId;
                         border.BorderBrush = new SolidColorBrush(Colors.Green);
+                        _selectedNodeId = nodeId;
+                        UpdateSelectedNodeVisual();
                     }
                     else
                     {
-                        // Начинаем перетаскивание
                         _isDragging = true;
                         _draggedNodeId = nodeId;
                         _dragStartPoint = e.GetPosition(GraphCanvas);
                         _nodeStartPosition = _nodePositions[nodeId];
-                        // Отмечаем узел как перемещённый вручную
                         _manuallyMovedNodes.Add(nodeId);
+                        _nodeWasMoved = false;
                         border.CaptureMouse();
                         e.Handled = true;
                     }
+                }
+            }
+            else
+            {
+                if (_selectedNodeId.HasValue)
+                {
+                    _selectedNodeId = null;
+                    UpdateSelectedNodeVisual();
                 }
             }
         }
@@ -503,14 +467,17 @@ namespace TreeMethod.Views
                 var deltaX = currentPos.X - _dragStartPoint.X;
                 var deltaY = currentPos.Y - _dragStartPoint.Y;
                 
+                if (Math.Abs(deltaX) > 5 || Math.Abs(deltaY) > 5)
+                {
+                    _nodeWasMoved = true;
+                }
+                
                 var newPos = new Point(
                     _nodeStartPosition.X + deltaX,
                     _nodeStartPosition.Y + deltaY);
                 
-                // Ограничиваем перемещение границами Canvas
                 var minX = 0;
                 var minY = 0;
-                // Используем Width/Height, так как они установлены динамически
                 var canvasWidth = GraphCanvas.Width > 0 ? GraphCanvas.Width : (GraphCanvas.ActualWidth > 0 ? GraphCanvas.ActualWidth : 2000);
                 var canvasHeight = GraphCanvas.Height > 0 ? GraphCanvas.Height : (GraphCanvas.ActualHeight > 0 ? GraphCanvas.ActualHeight : 1000);
                 var maxX = canvasWidth - NODE_WIDTH;
@@ -528,7 +495,6 @@ namespace TreeMethod.Views
                     Canvas.SetTop(border, newPos.Y);
                 }
                 
-                // Перерисовываем рёбра
                 RebuildGraph();
             }
         }
@@ -542,8 +508,17 @@ namespace TreeMethod.Views
                 {
                     border.ReleaseMouseCapture();
                 }
+                
+                if (!_nodeWasMoved)
+                {
+                    _selectedNodeId = _draggedNodeId.Value;
+                    UpdateSelectedNodeVisual();
+                    Keyboard.Focus(this);
+                }
+                
                 _isDragging = false;
                 _draggedNodeId = null;
+                _nodeWasMoved = false;
             }
             
             if (_isConnecting)
@@ -557,7 +532,6 @@ namespace TreeMethod.Views
                     }
                 }
                 
-                // Сбрасываем подсветку
                 if (_connectSourceId.HasValue)
                 {
                     var border = _nodeBorders[_connectSourceId.Value];
@@ -569,6 +543,7 @@ namespace TreeMethod.Views
                 
                 _isConnecting = false;
                 _connectSourceId = null;
+                Keyboard.Focus(this);
             }
         }
         
@@ -628,27 +603,17 @@ namespace TreeMethod.Views
         
         public void RefreshGraph()
         {
-            // Обновляем ссылку на актуальное дерево из ProjectData
-            // Это важно при загрузке нового проекта
             var currentTree = ProjectData.CurrentTree;
             
-            // Сбрасываем позиции и перестраиваем граф
             _nodePositions.Clear();
             _manuallyMovedNodes.Clear();
             
             if (currentTree.Nodes.Count == 0)
                 currentTree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
             
-            // Используем актуальное дерево для построения графа
             BuildGraph();
-            
-            // После построения смещаем все узлы к началу координат для удобства просмотра
             NormalizeNodePositions();
-            
-            // Перестраиваем граф с нормализованными позициями
             BuildGraph();
-            
-            // Автоматически прокручиваем в начало
             ScrollToGraphStart();
         }
         
@@ -657,17 +622,14 @@ namespace TreeMethod.Views
             if (!_nodePositions.Any())
                 return;
             
-            // Находим минимальные координаты
             double minX = _nodePositions.Values.Min(p => p.X);
             double minY = _nodePositions.Values.Min(p => p.Y);
             
-            // Если узлы начинаются не с (0,0), смещаем их к началу с небольшим отступом
             if (minX > 50 || minY > 50)
             {
                 double offsetX = Math.Max(0, minX - 50);
                 double offsetY = Math.Max(0, minY - 50);
                 
-                // Смещаем все позиции
                 var newPositions = new Dictionary<int, Point>();
                 foreach (var kvp in _nodePositions)
                 {
@@ -682,11 +644,9 @@ namespace TreeMethod.Views
             if (ScrollViewer == null)
                 return;
             
-            // Просто прокручиваем в начало - позиции уже нормализованы
             ScrollViewer.ScrollToHorizontalOffset(0);
             ScrollViewer.ScrollToVerticalOffset(0);
             
-            // Дополнительная попытка через задержку для гарантии
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (ScrollViewer != null)
@@ -707,21 +667,18 @@ namespace TreeMethod.Views
             if (result != MessageBoxResult.Yes)
                 return;
             
-            // Находим корень
             var allChildren = CurrentTree.Nodes.SelectMany(n => n.Children).ToHashSet();
             var root = CurrentTree.Nodes.FirstOrDefault(n => !allChildren.Contains(n.Id)) 
                        ?? CurrentTree.Nodes.FirstOrDefault();
             
             if (root == null)
             {
-                // Если корня нет, создаём новый
                 root = new ModelNode { Id = 0, Name = "Система", Type = NodeType.And };
                 CurrentTree.Nodes.Clear();
                 CurrentTree.Nodes.Add(root);
             }
             else
             {
-                // Удаляем все узлы кроме корня
                 var nodesToDelete = CurrentTree.Nodes.Where(n => n.Id != root.Id).Select(n => n.Id).ToList();
                 
                 foreach (var nodeId in nodesToDelete)
@@ -731,16 +688,14 @@ namespace TreeMethod.Views
                     _manuallyMovedNodes.Remove(nodeId);
                 }
                 
-                // Очищаем всех потомков корня
                 root.Children.Clear();
             }
             
-            // Сбрасываем позиции и перестраиваем граф
             _nodePositions.Clear();
             _manuallyMovedNodes.Clear();
             BuildGraph();
-                ProjectData.RaiseTreeChanged();
-            }
+            ProjectData.RaiseTreeChanged();
+        }
         
         private void Canvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
@@ -748,9 +703,9 @@ namespace TreeMethod.Views
             if (element?.Tag is int nodeId)
             {
                 _selectedNodeId = nodeId;
+                UpdateSelectedNodeVisual();
                 if (_nodeContextMenu != null)
                 {
-                    // Проверяем, есть ли место для добавления потомка
                     bool canAddChild = CanAddChild(nodeId);
                     var addChildItem = _nodeContextMenu.Items.OfType<MenuItem>()
                         .FirstOrDefault(mi => mi.Name == "AddChildMenuItem");
@@ -759,7 +714,6 @@ namespace TreeMethod.Views
                         addChildItem.IsEnabled = canAddChild;
                     }
                     
-                    // Отключаем удаление для корня
                     var deleteItem = _nodeContextMenu.Items.OfType<MenuItem>()
                         .FirstOrDefault(mi => mi.Name == "DeleteMenuItem");
                     if (deleteItem != null)
@@ -767,7 +721,6 @@ namespace TreeMethod.Views
                         deleteItem.IsEnabled = nodeId != 0;
                     }
                     
-                    // Отключаем "Висячий" для узлов с потомками
                     var changeTypeMenu = _nodeContextMenu.Items.OfType<MenuItem>()
                         .FirstOrDefault(mi => mi.Header?.ToString() == "Изменить тип");
                     if (changeTypeMenu != null)
@@ -787,31 +740,45 @@ namespace TreeMethod.Views
             }
         }
         
+        private void UpdateSelectedNodeVisual()
+        {
+            foreach (var kvp in _nodeBorders)
+            {
+                var border = kvp.Value;
+                if (border != null)
+                {
+                    if (kvp.Key == _selectedNodeId)
+                    {
+                        border.BorderBrush = new SolidColorBrush(Colors.Orange);
+                        border.BorderThickness = new Thickness(3);
+                    }
+                    else
+                    {
+                        border.BorderBrush = new SolidColorBrush(Colors.DarkGray);
+                        border.BorderThickness = new Thickness(2);
+                    }
+                }
+            }
+        }
+        
         private bool CanAddChild(int parentId)
         {
-            // Проверяем тип узла - к Leaf узлам нельзя добавлять потомков
             var parentNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == parentId);
             if (parentNode == null || parentNode.Type == NodeType.Leaf)
                 return false;
             
-            // Проверяем, есть ли место под родителем для нового узла
             if (!_nodePositions.ContainsKey(parentId))
-                return true; // Если позиции нет, разрешаем (автоматически разместится)
+                return true;
             
             var parentPos = _nodePositions[parentId];
             var canvasHeight = GraphCanvas.Height > 0 ? GraphCanvas.Height : 2000;
-            
-            // Вычисляем Y-координату нового потомка
             var newChildY = parentPos.Y + NODE_HEIGHT + NODE_SPACING_Y;
             
-            // Проверяем, поместится ли новый узел в Canvas
-            // Нужно место: newChildY + NODE_HEIGHT должно быть <= canvasHeight
             return newChildY + NODE_HEIGHT <= canvasHeight;
         }
         
         private void RebuildGraph()
         {
-            // Удаляем только рёбра, узлы оставляем
             var lines = GraphCanvas.Children.OfType<Line>().ToList();
             var polygons = GraphCanvas.Children.OfType<Polygon>().ToList();
             
@@ -831,19 +798,15 @@ namespace TreeMethod.Views
         
         private void TryConnectNodes(int parentId, int childId)
         {
-            // Валидация: один родитель на узел
             var hasOtherParent = CurrentTree.Nodes.Any(n => n.Children.Contains(childId) && n.Id != parentId);
             if (hasOtherParent)
             {
-                // Тихо игнорируем - соединение невозможно
                 return;
             }
             
-            // Валидация: отсутствие циклов
             var descendantsOfChild = GetNodeWithDescendants(childId);
             if (descendantsOfChild.Contains(parentId))
             {
-                // Тихо игнорируем - создание цикла невозможно
                 return;
             }
 
@@ -877,13 +840,10 @@ namespace TreeMethod.Views
             return result;
         }
 
-        // Основные операции
         private void AddChild(int parentId)
         {
             var parentNode = CurrentTree.Nodes.First(n => n.Id == parentId);
             
-            // Проверяем, что к узлу типа Leaf нельзя добавлять потомков
-            // Проверка уже выполняется через CanAddChild, которая отключает пункт меню
             if (parentNode.Type == NodeType.Leaf)
             {
                 return;
@@ -899,21 +859,17 @@ namespace TreeMethod.Views
                     parentNode.Children.Add(newId);
                 CurrentTree.Nodes.Add(newNode);
                 
-                // Размещаем новый узел под родителем
-                // Если родитель был перемещён вручную, размещаем новый узел относительно его текущей позиции
                 var parentPos = _nodePositions.ContainsKey(parentId) 
                     ? _nodePositions[parentId] 
                     : new Point(1000, 100);
                 
                 var newY = parentPos.Y + NODE_SPACING_Y;
                 
-                // Находим свободное место под родителем (смотрим, есть ли уже другие потомки)
                 var siblings = parentNode.Children.Where(cid => cid != newId && _nodePositions.ContainsKey(cid)).ToList();
                 
                 double newX;
                 if (siblings.Any())
                 {
-                    // Если есть другие потомки, размещаем справа от самого правого
                     var rightmostSibling = siblings
                         .Select(sid => _nodePositions[sid].X)
                         .Max();
@@ -921,9 +877,6 @@ namespace TreeMethod.Views
             }
             else
             {
-                    // Если это первый потомок, центрируем под родителем
-                    // Центр родителя: parentPos.X + NODE_WIDTH / 2
-                    // Центр нового узла должен быть там же, значит левый край: parentPos.X
                     newX = parentPos.X;
                 }
                 
@@ -954,7 +907,6 @@ namespace TreeMethod.Views
             var modelNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
             if (modelNode != null)
             {
-                // Проверка уже выполняется через отключение пункта меню
                 if (newType == NodeType.Leaf && modelNode.Children.Any())
                 {
                     return;
@@ -970,7 +922,6 @@ namespace TreeMethod.Views
         
         private void DeleteNode(int nodeId)
         {
-            // Проверка уже выполняется через отключение пункта меню
             if (nodeId == 0)
             {
                 return;
@@ -985,10 +936,15 @@ namespace TreeMethod.Views
                     node.Children.RemoveAll(childId => childId == id);
                 }
                 _nodePositions.Remove(id);
-                _manuallyMovedNodes.Remove(id); // Убираем из списка вручную перемещённых
+                _manuallyMovedNodes.Remove(id);
             }
             
             CurrentTree.Nodes.RemoveAll(n => nodesToDelete.Contains(n.Id));
+            
+            if (nodesToDelete.Contains(_selectedNodeId.GetValueOrDefault(-1)))
+            {
+                _selectedNodeId = null;
+            }
             
             BuildGraph();
             ProjectData.RaiseTreeChanged();
@@ -998,8 +954,18 @@ namespace TreeMethod.Views
         {
             if (e.Key == Key.Delete && _selectedNodeId.HasValue)
             {
-                DeleteNode(_selectedNodeId.Value);
+                var nodeIdToDelete = _selectedNodeId.Value;
+                _selectedNodeId = null;
+                DeleteNode(nodeIdToDelete);
                 e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                if (_selectedNodeId.HasValue)
+                {
+                    _selectedNodeId = null;
+                    BuildGraph();
+                }
             }
         }
     }
