@@ -589,7 +589,7 @@ namespace TreeMethod.Views
                 if (_selectedNodeId.HasValue) DeleteNode(_selectedNodeId.Value);
             };
             
-            var clearGraphItem = new MenuItem { Header = "Очистить граф, кроме корня" };
+            var clearGraphItem = new MenuItem { Header = "Очистить граф" };
             clearGraphItem.Click += (s, e) => ClearGraphExceptRoot();
             
             _nodeContextMenu.Items.Add(addChildItem);
