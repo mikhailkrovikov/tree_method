@@ -10,7 +10,6 @@
     <Grid HorizontalAlignment="Stretch" 
           VerticalAlignment="Stretch">
         <DockPanel>
-            <!-- Заголовок -->
             <Border DockPanel.Dock="Top"
                     Background="{StaticResource BackgroundWhite}"
                     BorderBrush="{StaticResource BorderColor}"
@@ -28,7 +27,6 @@
                           Padding="24">
                 <StackPanel Orientation="Vertical">
 
-                    <!-- Панель управления -->
                     <Border Background="{StaticResource BackgroundWhite}"
                             BorderBrush="{StaticResource BorderColor}"
                             BorderThickness="1"
@@ -66,7 +64,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Матрица E×P -->
                     <TextBlock Text="Матрица соответствий E×P (элементы × признаки)"
                                FontWeight="SemiBold" 
                                FontSize="16" 
@@ -92,7 +89,6 @@
                                   FontSize="14"/>
                     </Border>
 
-                    <!-- Матрица A×P -->
                     <TextBlock Text="Матрица целей A×P (цели × признаки)"
                                FontWeight="SemiBold" 
                                FontSize="16" 

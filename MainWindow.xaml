@@ -16,8 +16,7 @@
     </Window.Resources>
 
     <DockPanel Background="{StaticResource BackgroundWhite}">
-        <!-- Панель инструментов -->
-        <Border DockPanel.Dock="Top" 
+        <Border x:Name="ToolBarBorder" DockPanel.Dock="Top" 
                 Background="{StaticResource BackgroundWhite}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="0,0,0,1"
@@ -37,14 +36,12 @@
             </StackPanel>
         </Border>
 
-        <!-- Основной контент: TabControl + Панель расчёта -->
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="600" />
                 <ColumnDefinition Width="380" MinWidth="320" MaxWidth="450" />
             </Grid.ColumnDefinitions>
 
-            <!-- Вкладки: Граф и Матрицы -->
             <TabControl Grid.Column="0" 
                        x:Name="MainTabControl"
                        Style="{StaticResource ModernTabControl}">
@@ -66,7 +63,6 @@
                 </TabItem>
             </TabControl>
 
-            <!-- Боковая панель: Расчёт и Результаты -->
             <Border Grid.Column="1" 
                     BorderBrush="{StaticResource BorderColor}" 
                     BorderThickness="1,0,0,0"
@@ -74,14 +70,12 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" 
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="20" Orientation="Vertical">
-                        <!-- Заголовок -->
                         <TextBlock Text="Расчёт и результаты"
                                    FontSize="18"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource TextPrimary}"
                                    Margin="0,0,0,20" />
 
-                        <!-- Блок расчёта -->
                         <Border BorderThickness="1"
                                 BorderBrush="{StaticResource BorderColor}"
                                 CornerRadius="8"
@@ -102,11 +96,16 @@
                                         Command="{Binding RunCalculationCommand}"
                                         Style="{StaticResource ModernButton}"
                                         Height="42"
-                                        HorizontalAlignment="Stretch" />
+                                        HorizontalAlignment="Stretch">
+                                    <Button.ToolTip>
+                                        <ToolTip Visibility="{Binding HasCalculationDisabledReason, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding CalculationDisabledReason}" TextWrapping="Wrap" MaxWidth="300"/>
+                                        </ToolTip>
+                                    </Button.ToolTip>
+                                </Button>
                             </StackPanel>
                         </Border>
 
-                        <!-- Блок результатов -->
                         <Border BorderThickness="1"
                                 BorderBrush="{StaticResource BorderColor}"
                                 CornerRadius="8"
@@ -119,7 +118,6 @@
                                            Foreground="{StaticResource TextPrimary}"
                                            Margin="0,0,0,12"/>
 
-                                <!-- Теоретическое множество -->
                                 <TextBlock Text="|RT| ="
                                            FontSize="13"
                                            FontWeight="SemiBold"
@@ -132,7 +130,6 @@
                                          Background="{StaticResource BackgroundLight}"
                                          Margin="0,0,0,16"/>
 
-                                <!-- Рациональные решения -->
                                 <TextBlock Text="Рациональные решения:"
                                            FontSize="13"
                                            FontWeight="SemiBold"
@@ -150,7 +147,6 @@
                                          MaxHeight="500"
                                          Margin="0,0,0,16"/>
 
-                                <!-- Оптимальный вариант -->
                                 <TextBlock Text="Оптимальный вариант:"
                                            FontSize="13"
                                            FontWeight="SemiBold"

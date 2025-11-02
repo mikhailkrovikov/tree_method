@@ -20,7 +20,6 @@ namespace TreeMethod.Models
             }
         }
 
-        // Свойство для прямого доступа к значениям без индексатора
         public Dictionary<string, int> Values
         {
             get { return _values; }
@@ -56,7 +55,6 @@ namespace TreeMethod.Models
                 handler(this, new PropertyChangedEventArgs(propertyName));
         }
         
-        // Публичный метод для обновления Values извне
         public void NotifyValuesChanged()
         {
             OnPropertyChanged(nameof(Values));

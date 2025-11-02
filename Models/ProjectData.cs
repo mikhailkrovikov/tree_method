@@ -6,19 +6,20 @@ namespace TreeMethod.Models
     {
         public static TreeModel CurrentTree { get; set; } = new TreeModel();
 
-        // Событие, которое оповещает о любых изменениях дерева
         public static event Action TreeChanged;
+        public static event Action MatricesChanged;
 
         public static void RaiseTreeChanged()
         {
             TreeChanged?.Invoke();
+            MatricesChanged?.Invoke();
         }
 
-        // Обновление матриц после редактирования
         public static void UpdateMatrices(int[,] ep, int[,] ap)
         {
             CurrentTree.EP = ep;
             CurrentTree.AP = ap;
+            MatricesChanged?.Invoke();
         }
     }
 }

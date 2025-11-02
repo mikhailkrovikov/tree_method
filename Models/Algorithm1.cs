@@ -24,7 +24,6 @@ namespace TreeMethod.Models
 
         private static List<List<int>> CombosFrom(Node node, List<Node> nodes)
         {
-            // лист → комбинация из одного листа
             if (node.Children.Count == 0)
                 return new List<List<int>> { new List<int> { node.Id } };
 
@@ -39,7 +38,6 @@ namespace TreeMethod.Models
 
             if (node.Type == NodeType.And)
             {
-                // Декартово произведение
                 var result = new List<List<int>> { new List<int>() };
                 foreach (var combos in childCombos)
                 {
@@ -51,9 +49,8 @@ namespace TreeMethod.Models
                 }
                 return result;
             }
-            else // Or
+            else
             {
-                // Объединяем все варианты потомков
                 return childCombos.SelectMany(x => x).ToList();
             }
         }

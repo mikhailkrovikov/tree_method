@@ -33,42 +33,54 @@ namespace TreeMethod.Views
             panel.Children.Add(new TextBlock { Text = "Тип узла:" });
             var typeBox = new ComboBox { Margin = new Thickness(0, 0, 0, 15), Height = 28 };
             
-            // Создаем словарь для отображения русских названий типов
-            var typeItems = new List<KeyValuePair<NodeType, string>>
+            var nodeTypeItems = new List<KeyValuePair<NodeType, string>>
             {
                 new KeyValuePair<NodeType, string>(NodeType.And, "И"),
                 new KeyValuePair<NodeType, string>(NodeType.Or, "ИЛИ"),
                 new KeyValuePair<NodeType, string>(NodeType.Leaf, "Висячий")
             };
             
-            typeBox.ItemsSource = typeItems;
+            typeBox.ItemsSource = nodeTypeItems;
             typeBox.DisplayMemberPath = "Value";
             typeBox.SelectedValuePath = "Key";
             typeBox.SelectedValue = existingType;
             panel.Children.Add(typeBox);
 
-            var okButton = new Button { Content = "✅ OK", Width = 100, Height = 32, HorizontalAlignment = HorizontalAlignment.Center };
+            var okButton = new Button 
+            { 
+                Content = "✅ OK", 
+                Width = 100, 
+                Height = 32, 
+                HorizontalAlignment = HorizontalAlignment.Center,
+                IsEnabled = !string.IsNullOrWhiteSpace(existingName) && typeBox.SelectedValue != null,
+                IsDefault = true
+            };
+            
             okButton.Click += (s, e) =>
             {
-                if (string.IsNullOrWhiteSpace(nameBox.Text))
-                {
-                    MessageBox.Show("Введите имя узла.");
-                    return;
-                }
-
                 if (typeBox.SelectedValue is NodeType selectedType)
                 {
-                    NewNodeData = (nameBox.Text, selectedType);
+                    NewNodeData = (nameBox.Text.Trim(), selectedType);
                     DialogResult = true;
                 }
-                else
-                {
-                    MessageBox.Show("Выберите тип узла.");
-                }
             };
+            
+            void UpdateOkButtonState()
+            {
+                okButton.IsEnabled = !string.IsNullOrWhiteSpace(nameBox.Text.Trim()) && typeBox.SelectedValue != null;
+            }
+            
+            nameBox.TextChanged += (s, e) => UpdateOkButtonState();
+            typeBox.SelectionChanged += (s, e) => UpdateOkButtonState();
 
             panel.Children.Add(okButton);
             Content = panel;
+            
+            nameBox.Focus();
+            if (!string.IsNullOrWhiteSpace(existingName))
+            {
+                nameBox.SelectAll();
+            }
         }
     }
 }

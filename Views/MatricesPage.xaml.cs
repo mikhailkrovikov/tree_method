@@ -31,11 +31,9 @@ namespace TreeMethod.Views
             EPGrid.ItemsSource = ViewModel.EPRows;
             APGrid.ItemsSource = ViewModel.APRows;
             
-            // Подписываемся на события начала редактирования для добавления валидации ввода
             EPGrid.PreparingCellForEdit += DataGrid_PreparingCellForEdit;
             APGrid.PreparingCellForEdit += DataGrid_PreparingCellForEdit;
             
-            // Обновляем при изменении Features
             ViewModel.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(MatricesPageViewModel.Features))
@@ -45,7 +43,6 @@ namespace TreeMethod.Views
                 }
                 else if (e.PropertyName == nameof(MatricesPageViewModel.Goals))
                 {
-                    // При изменении Goals обновляем заголовки строк
                     RefreshAPRowHeaders();
                 }
             };
@@ -56,7 +53,6 @@ namespace TreeMethod.Views
         {
             grid.Columns.Clear();
             
-            // Колонка с именем
             grid.Columns.Add(new DataGridTextColumn
             {
                 Header = nameColumnHeader,
@@ -65,20 +61,17 @@ namespace TreeMethod.Views
                 Width = 300
             });
             
-            // Колонки с признаками (с редактируемыми заголовками)
             for (int i = 0; i < featureNames.Length; i++)
             {
-                var featureIndex = i; // Захватываем индекс для замыкания
+                var featureIndex = i;
                 var featureName = featureNames[i];
                 
-                // Используем DataGridTemplateColumn для редактируемого заголовка
                 var column = new DataGridTemplateColumn
                 {
                     Header = CreateEditableHeader(featureName, featureIndex, grid),
                     Width = 80
                 };
                 
-                // Ячейка для отображения значения
                 var cellTemplate = new DataTemplate();
                 var textBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
                 textBlockFactory.SetBinding(TextBlock.TextProperty, new Binding($"Values[{featureName}]"));
@@ -88,7 +81,6 @@ namespace TreeMethod.Views
                 cellTemplate.VisualTree = textBlockFactory;
                 column.CellTemplate = cellTemplate;
                 
-                // Ячейка для редактирования значения
                 var editingTemplate = new DataTemplate();
                 var textBoxFactory = new FrameworkElementFactory(typeof(TextBox));
                 textBoxFactory.SetBinding(TextBox.TextProperty, new Binding($"Values[{featureName}]") { UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
@@ -116,13 +108,12 @@ namespace TreeMethod.Views
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Cursor = Cursors.IBeam,
-                Tag = featureIndex, // Сохраняем индекс для восстановления
+                Tag = featureIndex,
                 FontSize = 13
             };
             
             stackPanel.Children.Add(textBlock);
             
-            // Обработчик клика для редактирования
             textBlock.PreviewMouseLeftButtonDown += (s, e) =>
             {
                 e.Handled = true;
@@ -140,14 +131,12 @@ namespace TreeMethod.Views
                     Tag = index
                 };
                 
-                // Заменяем TextBlock на TextBox
                 stackPanel.Children.Clear();
                 stackPanel.Children.Add(headerTextBox);
                 
                 headerTextBox.Focus();
                 headerTextBox.SelectAll();
                 
-                // Сохраняем при потере фокуса или нажатии Enter
                 void SaveHeader(object sender, RoutedEventArgs args)
                 {
                     var newName = headerTextBox.Text.Trim();
@@ -156,12 +145,10 @@ namespace TreeMethod.Views
                     if (!string.IsNullOrEmpty(newName) && newName != oldName)
                     {
                         ViewModel?.RenameFeature(savedIndex, newName);
-                        // Перестраиваем все колонки после переименования
                         SetupDataGrids();
                 }
                 else
                 {
-                        // Восстанавливаем старое значение
                         stackPanel.Children.Clear();
                         var restoreTextBlock = CreateEditableHeader(oldName, savedIndex, grid);
                         stackPanel.Children.Add(restoreTextBlock);
@@ -179,7 +166,6 @@ namespace TreeMethod.Views
                     }
                     else if (args.Key == Key.Escape)
                     {
-                        // Отмена редактирования
                         var savedIndex = (int)headerTextBox.Tag;
                         stackPanel.Children.Clear();
                         var restoreTextBlock = CreateEditableHeader(oldName, savedIndex, grid);
@@ -196,12 +182,10 @@ namespace TreeMethod.Views
             return stackPanel;
         }
         
-        // Специальный метод для настройки APGrid с редактируемыми заголовками строк
         private void SetupAPGrid(DataGrid grid, string[] featureNames)
         {
             grid.Columns.Clear();
             
-            // Колонки с признаками (с редактируемыми заголовками)
             for (int i = 0; i < featureNames.Length; i++)
             {
                 var featureIndex = i;
@@ -228,7 +212,6 @@ namespace TreeMethod.Views
                 textBoxFactory.SetValue(TextBox.FontSizeProperty, 14.0);
                 textBoxFactory.SetValue(TextBox.HorizontalAlignmentProperty, HorizontalAlignment.Center);
                 textBoxFactory.SetValue(TextBox.VerticalAlignmentProperty, VerticalAlignment.Center);
-                // Добавляем обработчик для валидации ввода
                 textBoxFactory.AddHandler(TextBox.PreviewTextInputEvent, new TextCompositionEventHandler(TextBox_PreviewTextInput));
                 textBoxFactory.AddHandler(TextBox.KeyDownEvent, new KeyEventHandler(TextBox_KeyDown));
                 editingTemplate.VisualTree = textBoxFactory;
@@ -245,7 +228,6 @@ namespace TreeMethod.Views
                 var rowIndex = e.Row.GetIndex();
                 if (rowIndex >= 0 && rowIndex < ViewModel.Goals.Count)
                 {
-                    // Создаем редактируемый заголовок строки
                     e.Row.Header = CreateEditableRowHeader(ViewModel.Goals[rowIndex], rowIndex);
                 }
             }
@@ -273,7 +255,6 @@ namespace TreeMethod.Views
             
             stackPanel.Children.Add(textBlock);
             
-            // Обработчик клика для редактирования
             textBlock.PreviewMouseLeftButtonDown += (s, e) =>
             {
                 e.Handled = true;
@@ -291,14 +272,12 @@ namespace TreeMethod.Views
                     Tag = index
                 };
                 
-                // Заменяем TextBlock на TextBox
                 stackPanel.Children.Clear();
                 stackPanel.Children.Add(headerTextBox);
                 
                 headerTextBox.Focus();
                 headerTextBox.SelectAll();
                 
-                // Сохраняем при потере фокуса или нажатии Enter
                 void SaveHeader(object sender, RoutedEventArgs args)
                 {
                     var newName = headerTextBox.Text.Trim();
@@ -307,12 +286,10 @@ namespace TreeMethod.Views
                     if (!string.IsNullOrEmpty(newName) && newName != oldName)
                     {
                         ViewModel?.RenameGoal(savedIndex, newName);
-                        // Перестраиваем заголовки строк после переименования
                         RefreshAPRowHeaders();
                 }
                 else
                 {
-                        // Восстанавливаем старое значение
                         stackPanel.Children.Clear();
                         var restoreTextBlock = CreateEditableRowHeader(oldName, savedIndex);
                         stackPanel.Children.Add(restoreTextBlock);
@@ -330,7 +307,6 @@ namespace TreeMethod.Views
                     }
                     else if (args.Key == Key.Escape)
                     {
-                        // Отмена редактирования
                         var savedIndex = (int)headerTextBox.Tag;
                         stackPanel.Children.Clear();
                         var restoreTextBlock = CreateEditableRowHeader(oldName, savedIndex);
@@ -383,9 +359,8 @@ namespace TreeMethod.Views
         {
             if (e.EditingElement is TextBox textBox && ViewModel != null && !ViewModel.ValidateMatrixValue(textBox.Text))
             {
-                // Просто сбрасываем на допустимое значение, без сообщения
                 textBox.Text = "0";
-                e.Cancel = false; // Разрешаем завершение редактирования с исправленным значением
+                e.Cancel = false;
             }
         }
 
@@ -397,15 +372,12 @@ namespace TreeMethod.Views
 
         private void DataGrid_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
         {
-            // Добавляем валидацию ввода для TextBox при редактировании ячейки
             if (e.EditingElement is TextBox textBox)
             {
-                // Очищаем предыдущие обработчики
                 textBox.PreviewTextInput -= TextBox_PreviewTextInput;
                 textBox.KeyDown -= TextBox_KeyDown;
                 textBox.PreviewKeyDown -= TextBox_PreviewKeyDown;
                 
-                // Добавляем новые обработчики
                 textBox.PreviewTextInput += TextBox_PreviewTextInput;
                 textBox.KeyDown += TextBox_KeyDown;
                 textBox.PreviewKeyDown += TextBox_PreviewKeyDown;
@@ -417,20 +389,16 @@ namespace TreeMethod.Views
             var textBox = sender as TextBox;
             if (textBox == null) return;
             
-            // Получаем текущий текст с учетом выделения
             string currentText = textBox.Text ?? "";
             int selectionStart = textBox.SelectionStart;
             int selectionLength = textBox.SelectionLength;
             
-            // Формируем новый текст после вставки
             string newText = currentText.Substring(0, selectionStart) + 
                            e.Text + 
                            currentText.Substring(selectionStart + selectionLength);
             
-            // Проверяем каждый вводимый символ
             foreach (char c in e.Text)
             {
-                // Разрешаем только минус, цифры 0 и 1
                 if (c != '-' && c != '0' && c != '1')
                 {
                     e.Handled = true;
@@ -438,20 +406,16 @@ namespace TreeMethod.Views
                 }
             }
             
-            // Проверяем, что итоговый текст может стать валидным значением
             newText = newText.Trim();
             
-            // Разрешаем пустую строку, "-", "0", "1", "-1"
             if (newText.Length > 2)
             {
                 e.Handled = true;
                 return;
             }
             
-            // Проверяем, что минус может быть только в начале
             if (newText.Contains('-') && (newText.IndexOf('-') != 0 || newText.Length == 1))
             {
-                // Если минус не в начале или это просто "-", разрешаем (промежуточное состояние)
                 if (newText != "-" && newText.Length > 1)
                 {
                     e.Handled = true;
@@ -459,7 +423,6 @@ namespace TreeMethod.Views
                 }
             }
             
-            // Проверяем, что после минуса может быть только 1
             if (newText.StartsWith("-") && newText.Length == 2 && newText[1] != '1')
             {
                 e.Handled = true;
@@ -469,20 +432,18 @@ namespace TreeMethod.Views
 
         private void TextBox_KeyDown(object sender, KeyEventArgs e)
         {
-            // Разрешаем Delete, Backspace, Tab, Enter, стрелки
             if (e.Key == Key.Delete || e.Key == Key.Back || 
                 e.Key == Key.Tab || e.Key == Key.Enter || 
                 e.Key == Key.Left || e.Key == Key.Right || 
                 e.Key == Key.Up || e.Key == Key.Down ||
                 (Keyboard.Modifiers == ModifierKeys.Control && (e.Key == Key.A || e.Key == Key.C || e.Key == Key.V || e.Key == Key.X)))
             {
-                return; // Разрешаем эти клавиши
+                return;
             }
             
-            // Блокируем все остальные клавиши, кроме цифр и минуса
-            if (!((e.Key >= Key.D0 && e.Key <= Key.D1) || // Цифры 0 и 1
-                  (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad1) || // Цифры на NumPad
-                  e.Key == Key.Subtract || e.Key == Key.OemMinus)) // Минус
+            if (!((e.Key >= Key.D0 && e.Key <= Key.D1) ||
+                  (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad1) ||
+                  e.Key == Key.Subtract || e.Key == Key.OemMinus))
             {
                 e.Handled = true;
             }
@@ -493,7 +454,6 @@ namespace TreeMethod.Views
             var textBox = sender as TextBox;
             if (textBox == null) return;
             
-            // Обработка вставки (Ctrl+V)
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
             {
                 var clipboardText = Clipboard.GetText();
@@ -511,29 +471,22 @@ namespace TreeMethod.Views
         private bool IsValidMatrixValue(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
-                return true; // Пустая строка разрешена (будет заменена на 0)
+                return true;
             
-            // Убираем пробелы для проверки
             text = text.Trim();
             
-            // Проверяем, что текст является одним из допустимых значений
             return text == "-1" || text == "0" || text == "1" || text == "-" || text == "";
         }
 
         private void DataGrid_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            // Если прокручиваем DataGrid, передаем событие прокрутки в родительский ScrollViewer
             if (sender is DataGrid && MainScrollViewer != null)
             {
-                // Проверяем, не находится ли DataGrid в процессе горизонтальной прокрутки
-                // Если Shift не нажат, прокручиваем вертикально
                 if (Keyboard.Modifiers != ModifierKeys.Shift)
                 {
-                    // Нормализуем Delta (обычно кратно 120) и прокручиваем ScrollViewer
-                    var scrollAmount = e.Delta / 3.0; // Делаем прокрутку более плавной
+                    var scrollAmount = e.Delta / 3.0;
                     var newOffset = MainScrollViewer.VerticalOffset - scrollAmount;
                     
-                    // Ограничиваем в допустимых пределах
                     newOffset = Math.Max(0, Math.Min(newOffset, MainScrollViewer.ScrollableHeight));
                     MainScrollViewer.ScrollToVerticalOffset(newOffset);
                     e.Handled = true;
