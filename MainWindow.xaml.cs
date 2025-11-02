@@ -130,6 +130,8 @@ namespace TreeMethod
                         Type = NodeType.And 
                     });
                 }
+                // Назначаем уровни новому дереву
+                newTree.AssignLevels();
                 ProjectData.CurrentTree = newTree;
                 _currentFilePath = null;
                 ProjectData.RaiseTreeChanged();

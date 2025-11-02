@@ -20,7 +20,7 @@ namespace TreeMethod.Models
             {
                 var active = GetClosureWithoutRoot(comboLeaves, tree, rootId);
 
-                int score = EvaluateActiveSet(active, tree.EP, tree.AP, tree.GoalWeights, rowIndexById);
+                int score = EvaluateActiveSet(active, tree.EP, tree.AP, tree.GoalWeights, rowIndexById, tree);
                 var names = comboLeaves.Select(id => tree.Nodes.First(n => n.Id == id).Name).ToList();
 
                 results.Add(new RationalSolution { Elements = names, Score = score });
@@ -30,7 +30,7 @@ namespace TreeMethod.Models
         }
 
         private static int EvaluateActiveSet(HashSet<int> activeNodeIds, int[,] EP, int[,] AP, int[] goalWeights,
-                                             Dictionary<int, int> rowIndexById)
+                                             Dictionary<int, int> rowIndexById, TreeModel tree)
         {
             if (EP == null || AP == null || goalWeights == null) return 0;
 
@@ -42,14 +42,22 @@ namespace TreeMethod.Models
             // Проверяем, что количество признаков совпадает между EP и AP
             int actualFeatures = Math.Min(features, apCols);
 
-            var sumFeat = new int[actualFeatures];
+            var sumFeat = new double[actualFeatures]; // Используем double для точности при умножении на levelWeight
             foreach (var nodeId in activeNodeIds)
             {
                 if (!rowIndexById.TryGetValue(nodeId, out int row)) continue;
                 // Проверяем, что индекс строки не выходит за границы массива EP
                 if (row >= epRows) continue;
+                
+                // Получаем узел для определения уровня
+                var node = tree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+                if (node == null) continue;
+                
+                // Вычисляем вес уровня: 1 / (1 + Level) - чем глубже уровень, тем меньше вес
+                double levelWeight = 1.0 / (1.0 + node.Level);
+                
                 for (int p = 0; p < actualFeatures; p++)
-                    sumFeat[p] += EP[row, p];
+                    sumFeat[p] += levelWeight * EP[row, p];
             }
 
             int total = 0;
@@ -58,10 +66,10 @@ namespace TreeMethod.Models
                 // Проверяем, что индекс цели не выходит за границы массива goalWeights
                 if (g >= goalWeights.Length) continue;
                 
-                int goalScore = 0;
+                double goalScore = 0;
                 for (int p = 0; p < actualFeatures; p++)
                     goalScore += sumFeat[p] * AP[g, p];
-                total += goalScore * goalWeights[g];
+                total += (int)Math.Round(goalScore * goalWeights[g]);
             }
             return total;
         }

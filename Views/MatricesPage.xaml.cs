@@ -540,5 +540,41 @@ namespace TreeMethod.Views
                 }
             }
         }
+
+        private void GoalWeightTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+
+            // Проверяем каждый вводимый символ - разрешаем только цифры
+            foreach (char c in e.Text)
+            {
+                if (!char.IsDigit(c))
+                {
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+
+        private void GoalWeightTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Разрешаем Delete, Backspace, Tab, Enter, стрелки
+            if (e.Key == Key.Delete || e.Key == Key.Back ||
+                e.Key == Key.Tab || e.Key == Key.Enter ||
+                e.Key == Key.Left || e.Key == Key.Right ||
+                e.Key == Key.Up || e.Key == Key.Down ||
+                (Keyboard.Modifiers == ModifierKeys.Control && (e.Key == Key.A || e.Key == Key.C || e.Key == Key.V || e.Key == Key.X)))
+            {
+                return; // Разрешаем эти клавиши
+            }
+
+            // Разрешаем только цифры
+            if (!((e.Key >= Key.D0 && e.Key <= Key.D9) ||
+                  (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9)))
+            {
+                e.Handled = true;
+            }
+        }
     }
 }

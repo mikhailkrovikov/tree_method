@@ -118,6 +118,45 @@
                                   FontSize="14"
                                   LoadingRow="APGrid_LoadingRow"/>
                     </Border>
+
+                    <!-- Веса целей (Goal Weights) -->
+                    <TextBlock Text="Веса целей (Goal Weights)"
+                               FontWeight="SemiBold" 
+                               FontSize="16" 
+                               Foreground="{StaticResource TextPrimary}"
+                               Margin="0,0,0,12"/>
+                    <Border BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Background="{StaticResource BackgroundWhite}"
+                            Padding="16"
+                            Margin="0,0,0,24">
+                        <ItemsControl x:Name="GoalWeightsContainer"
+                                      ItemsSource="{Binding GoalWeights}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                                        <TextBlock Text="{Binding GoalName}" 
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   FontSize="13"
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   MinWidth="60"/>
+                                        <TextBox Text="{Binding Weight, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 Width="70"
+                                                 PreviewTextInput="GoalWeightTextBox_PreviewTextInput"
+                                                 KeyDown="GoalWeightTextBox_KeyDown"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>

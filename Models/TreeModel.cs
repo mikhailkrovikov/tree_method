@@ -15,6 +15,64 @@ namespace TreeMethod.Models
         public List<string> GoalNames { get; set; } = new(); // Названия целей (A1, A2, ...)
 
         // ===============================
+        //  Назначение уровней узлам
+        // ===============================
+
+        /// <summary>
+        /// Назначает уровни всем узлам дерева. Вызывается автоматически при загрузке или изменении дерева.
+        /// </summary>
+        public void AssignLevels()
+        {
+            if (Nodes == null || Nodes.Count == 0) return;
+
+            // Находим корень (узел без родителей)
+            var allChildren = Nodes.SelectMany(n => n.Children).ToHashSet();
+            var root = Nodes.FirstOrDefault(n => !allChildren.Contains(n.Id)) ?? Nodes.FirstOrDefault();
+            
+            if (root != null)
+            {
+                AssignLevelsRecursive(root, 0);
+            }
+        }
+
+        private void AssignLevelsRecursive(Node node, int level)
+        {
+            // Не перезаписываем уровень, если он был установлен вручную
+            if (!node.IsLevelManual)
+            {
+                node.Level = level;
+            }
+            
+            // Для детей используем либо ручной уровень узла, либо вычисленный
+            int childBaseLevel = node.IsLevelManual ? node.Level : level;
+            
+            foreach (var childId in node.Children)
+            {
+                var child = Nodes.FirstOrDefault(n => n.Id == childId);
+                if (child != null)
+                {
+                    // Если у ребенка нет ручного уровня, вычисляем его относительно родителя
+                    if (!child.IsLevelManual)
+                    {
+                        AssignLevelsRecursive(child, childBaseLevel + 1);
+                    }
+                    else
+                    {
+                        // У ребенка ручной уровень, но всё равно проверяем его потомков
+                        foreach (var grandChildId in child.Children)
+                        {
+                            var grandChild = Nodes.FirstOrDefault(n => n.Id == grandChildId);
+                            if (grandChild != null && !grandChild.IsLevelManual)
+                            {
+                                AssignLevelsRecursive(grandChild, child.Level + 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ===============================
         //  Сохранение / Загрузка проекта
         // ===============================
 
@@ -29,7 +87,10 @@ namespace TreeMethod.Models
         {
             var json = File.ReadAllText(path);
             var data = JsonSerializer.Deserialize<SerializableTreeModel>(json);
-            return data?.ToTreeModel();
+            var model = data?.ToTreeModel();
+            // Назначаем уровни после загрузки
+            model?.AssignLevels();
+            return model;
         }
     }
 
@@ -40,6 +101,8 @@ namespace TreeMethod.Models
         public string Name { get; set; } = string.Empty;
         public int Type { get; set; } // JSON формат: 0=And, 1=Or, 2=Leaf
         public List<int> Children { get; set; } = new();
+        public int Level { get; set; } = 0;
+        public bool IsLevelManual { get; set; } = false;
         
         public SerializableNode() { }
         
@@ -49,6 +112,8 @@ namespace TreeMethod.Models
             Name = node.Name;
             Type = NodeTypeConverter.ToJsonFormat(node.Type);
             Children = node.Children;
+            Level = node.Level;
+            IsLevelManual = node.IsLevelManual;
         }
         
         public Node ToNode()
@@ -58,7 +123,9 @@ namespace TreeMethod.Models
                 Id = Id,
                 Name = Name,
                 Type = NodeTypeConverter.FromJsonFormat(Type),
-                Children = Children
+                Children = Children,
+                Level = Level,
+                IsLevelManual = IsLevelManual
             };
         }
     }

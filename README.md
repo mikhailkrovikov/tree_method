@@ -2,6 +2,30 @@
 
 Приложение для построения И-ИЛИ деревьев и расчета рациональных технических решений.
 
+## Требования для сборки и запуска
+
+- **.NET SDK 9.0** или выше
+- **Windows** (приложение использует WPF)
+- **Visual Studio 2022** или **Visual Studio Code** (опционально, для разработки)
+
+## Сборка проекта
+
+### Через командную строку:
+```bash
+dotnet restore
+dotnet build
+dotnet run
+```
+
+### Через Visual Studio:
+1. Откройте `TreeMethod.sln` в Visual Studio
+2. Нажмите `F5` для запуска или `Ctrl+Shift+B` для сборки
+3. Исполняемый файл будет находиться в `bin/Debug/net9.0-windows/TreeMethod.exe`
+
+## Запуск приложения
+
+После сборки запустите `TreeMethod.exe` из папки `bin/Debug/net9.0-windows/` или `bin/Release/net9.0-windows/` (если собирали в Release режиме).
+
 ## Основные возможности
 
 - Построение и редактирование И-ИЛИ дерева (граф)
@@ -156,4 +180,19 @@
 - При вводе недопустимых значений они автоматически заменяются на 0
 
 **Иные проблемы:**
-- пишите на mikhailkrovikov@gmail.com
+- Обращайтесь к разработчику проекта
+
+---
+
+## Структура проекта
+
+```
+tree_method/
+├── Models/              # Модели данных (Node, TreeModel, MatrixRow и т.д.)
+├── Views/               # Представления (TreePage, MatricesPage и т.д.)
+├── ViewModels/          # ViewModels (MatricesPageViewModel)
+├── Helpers/             # Вспомогательные классы (RelayCommand, конвертеры)
+├── MainWindow.xaml      # Главное окно приложения
+├── App.xaml             # Конфигурация приложения и стили
+└── README.md            # Документация
+```

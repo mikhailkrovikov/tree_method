@@ -56,7 +56,12 @@ namespace TreeMethod.Views
             InitializeComponent();
 
             if (CurrentTree.Nodes.Count == 0)
+            {
                 CurrentTree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
+            }
+            
+            // Назначаем уровни при инициализации
+            CurrentTree.AssignLevels();
 
             Focusable = true;
             InitializeContextMenu();
@@ -345,10 +350,10 @@ namespace TreeMethod.Views
                     Tag = node.Id
                 };
                 
-                // Создаём TextBlock для текста
+                // Создаём TextBlock для текста с отображением уровня
                 var textBlock = new TextBlock
                 {
-                    Text = node.Name,
+                    Text = $"{node.Name}\n({node.Type}, L{node.Level})",
                     FontSize = 12,
                     FontFamily = new FontFamily("Arial"),
                     Foreground = new SolidColorBrush(Colors.Black),
@@ -588,6 +593,12 @@ namespace TreeMethod.Views
                 if (_selectedNodeId.HasValue) RenameNode(_selectedNodeId.Value);
             };
 
+            var changeLevelItem = new MenuItem { Header = "Изменить уровень" };
+            changeLevelItem.Click += (s, e) =>
+            {
+                if (_selectedNodeId.HasValue) ChangeNodeLevel(_selectedNodeId.Value);
+            };
+
             var changeTypeMenu = new MenuItem { Header = "Изменить тип" };
             var typeAndItem = new MenuItem { Header = "И" };
             typeAndItem.Click += (s, e) =>
@@ -619,6 +630,7 @@ namespace TreeMethod.Views
             
             _nodeContextMenu.Items.Add(addChildItem);
             _nodeContextMenu.Items.Add(renameItem);
+            _nodeContextMenu.Items.Add(changeLevelItem);
             _nodeContextMenu.Items.Add(changeTypeMenu);
             _nodeContextMenu.Items.Add(new Separator());
             _nodeContextMenu.Items.Add(clearGraphItem);
@@ -638,6 +650,9 @@ namespace TreeMethod.Views
             
             if (currentTree.Nodes.Count == 0)
                 currentTree.Nodes.Add(new ModelNode { Id = 0, Name = "Система", Type = NodeType.And });
+            
+            // Назначаем уровни перед построением графа
+            currentTree.AssignLevels();
             
             // Используем актуальное дерево для построения графа
             BuildGraph();
@@ -854,6 +869,8 @@ namespace TreeMethod.Views
             if (!parentNode.Children.Contains(childId))
                 parentNode.Children.Add(childId);
 
+            // Назначаем уровни после изменения структуры дерева
+            CurrentTree.AssignLevels();
             BuildGraph();
             ProjectData.RaiseTreeChanged();
         }
@@ -929,6 +946,8 @@ namespace TreeMethod.Views
                 
                 _nodePositions[newId] = new Point(newX, newY);
                 
+                // Назначаем уровни после добавления узла
+                CurrentTree.AssignLevels();
                 BuildGraph();
                 ProjectData.RaiseTreeChanged();
             }
@@ -943,12 +962,47 @@ namespace TreeMethod.Views
                 node.Name = dialog.NewNodeData.Name;
                 if (_nodeLabels.ContainsKey(nodeId))
                 {
-                    _nodeLabels[nodeId].Text = node.Name;
+                    // Обновляем текст с учетом уровня
+                    _nodeLabels[nodeId].Text = $"{node.Name}\n({node.Type}, L{node.Level})";
                 }
                 ProjectData.RaiseTreeChanged();
             }
         }
         
+        private void ChangeNodeLevel(int nodeId)
+        {
+            var node = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
+            if (node == null) return;
+
+            var dialog = new ChangeLevelDialog(node.Name, node.Level, node.IsLevelManual);
+            if (dialog.ShowDialog() == true)
+            {
+                // Если переключаемся на автоматический режим, сбрасываем ручной уровень
+                if (!dialog.IsManual)
+                {
+                    node.IsLevelManual = false;
+                    // Пересчитываем уровни (узел получит автоматический уровень)
+                    CurrentTree.AssignLevels();
+                }
+                else
+                {
+                    // Устанавливаем ручной уровень
+                    node.Level = dialog.NewLevel;
+                    node.IsLevelManual = true;
+                }
+                
+                // Обновляем текст узла с новым уровнем
+                if (_nodeLabels.ContainsKey(nodeId))
+                {
+                    _nodeLabels[nodeId].Text = $"{node.Name}\n({node.Type}, L{node.Level})";
+                }
+                
+                // Обновляем все узлы на графе
+                BuildGraph();
+                ProjectData.RaiseTreeChanged();
+            }
+        }
+
         private void ChangeNodeType(int nodeId, NodeType newType)
         {
             var modelNode = CurrentTree.Nodes.FirstOrDefault(n => n.Id == nodeId);
@@ -990,6 +1044,8 @@ namespace TreeMethod.Views
             
             CurrentTree.Nodes.RemoveAll(n => nodesToDelete.Contains(n.Id));
             
+            // Назначаем уровни после удаления узлов
+            CurrentTree.AssignLevels();
             BuildGraph();
             ProjectData.RaiseTreeChanged();
         }

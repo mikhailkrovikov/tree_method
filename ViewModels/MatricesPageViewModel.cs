@@ -36,6 +36,7 @@ namespace TreeMethod.ViewModels
         public ObservableCollection<MatrixRow> APRows { get; }
         public ObservableCollection<string> Features { get; }
         public ObservableCollection<string> Goals { get; }
+        public ObservableCollection<GoalWeightViewModel> GoalWeights { get; } = new ObservableCollection<GoalWeightViewModel>();
 
         public int FeaturesCount
         {
@@ -97,6 +98,9 @@ namespace TreeMethod.ViewModels
             // Загружаем матрицы
             LoadEPMatrix(tree, pCount);
             LoadAPMatrix(tree, pCount, aCount);
+            
+            // Загружаем веса целей
+            LoadGoalWeights(tree, aCount);
         }
 
         private (int featuresCount, int goalsCount) DetermineMatrixSizes(TreeModel tree)
@@ -202,6 +206,25 @@ namespace TreeMethod.ViewModels
                 LoadMatrixRowValues(row, tree.AP, i, pCount, Features.ToArray());
                 APRows.Add(row);
             }
+        }
+
+        private void LoadGoalWeights(TreeModel tree, int aCount)
+        {
+            GoalWeights.Clear();
+            
+            for (int i = 0; i < aCount; i++)
+            {
+                var goalName = (i < Goals.Count) ? Goals[i] : $"A{i + 1}";
+                // Загружаем вес из сохраненных данных, если есть, иначе по умолчанию 1
+                int weight = 1;
+                if (tree.GoalWeights != null && i < tree.GoalWeights.Length)
+                {
+                    weight = tree.GoalWeights[i];
+                }
+                GoalWeights.Add(new GoalWeightViewModel(goalName, weight));
+            }
+            
+            OnPropertyChanged(nameof(GoalWeights));
         }
 
         private void LoadMatrixRowValues(MatrixRow row, int[,] matrix, int rowIndex, int columnCount, string[] featureNames)
@@ -370,6 +393,44 @@ namespace TreeMethod.ViewModels
                 }
                 row.NotifyValuesChanged();
             }
+            
+            // Обновляем веса целей
+            UpdateGoalWeights(newGoalsCount, newGoalNames);
+        }
+
+        private void UpdateGoalWeights(int newGoalsCount, List<string> newGoalNames)
+        {
+            // Сохраняем текущие веса по индексам (так как названия могут меняться)
+            var currentWeights = new List<int>();
+            for (int i = 0; i < GoalWeights.Count; i++)
+            {
+                currentWeights.Add(GoalWeights[i].Weight);
+            }
+            
+            // Удаляем лишние веса
+            while (GoalWeights.Count > newGoalsCount)
+            {
+                GoalWeights.RemoveAt(GoalWeights.Count - 1);
+            }
+            
+            // Добавляем или обновляем веса
+            for (int i = 0; i < newGoalsCount; i++)
+            {
+                var goalName = newGoalNames[i];
+                if (i < GoalWeights.Count)
+                {
+                    // Обновляем название, сохраняя текущий вес
+                    GoalWeights[i].GoalName = goalName;
+                }
+                else
+                {
+                    // Новый вес цели - используем сохраненный вес, если есть, иначе 1
+                    int weight = (i < currentWeights.Count) ? currentWeights[i] : 1;
+                    GoalWeights.Add(new GoalWeightViewModel(goalName, weight));
+                }
+            }
+            
+            OnPropertyChanged(nameof(GoalWeights));
         }
 
         public bool ValidateMatrixValue(string input)
@@ -388,9 +449,16 @@ namespace TreeMethod.ViewModels
 
             ProjectData.UpdateMatrices(ep, ap);
             
-            // Сохраняем названия признаков
+            // Сохраняем названия признаков и целей, а также веса целей
             var tree = ProjectData.CurrentTree;
             tree.FeatureNames = new List<string>(Features);
+            tree.GoalNames = new List<string>(Goals);
+            
+            // Сохраняем веса целей
+            if (GoalWeights != null && GoalWeights.Count > 0)
+            {
+                tree.GoalWeights = GoalWeights.Select(gw => gw.Weight).ToArray();
+            }
             
             // Матрицы сохранены тихо, без уведомления
         }
@@ -453,6 +521,12 @@ namespace TreeMethod.ViewModels
                 APRows[index].Name = newName;
             }
             
+            // Обновляем название в весах целей
+            if (index < GoalWeights.Count)
+            {
+                GoalWeights[index].GoalName = newName;
+            }
+            
             OnPropertyChanged(nameof(Goals));
         }
 
@@ -481,10 +555,16 @@ namespace TreeMethod.ViewModels
 
             ProjectData.UpdateMatrices(ep, ap);
             
-            // Сохраняем названия признаков и целей
+            // Сохраняем названия признаков и целей, а также веса целей
             var tree = ProjectData.CurrentTree;
             tree.FeatureNames = new List<string>(Features);
             tree.GoalNames = new List<string>(Goals);
+            
+            // Сохраняем веса целей
+            if (GoalWeights != null && GoalWeights.Count > 0)
+            {
+                tree.GoalWeights = GoalWeights.Select(gw => gw.Weight).ToArray();
+            }
         }
     }
 }
